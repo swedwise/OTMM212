@@ -1,0 +1,27 @@
+# Use this file to configure otds sub-chart
+#
+  
+global:
+  namespace: default
+  storage:
+    class: &storage_class "standard"
+
+ingress:
+  class: &ingress_class nginx
+  annotations: { nginx.ingress.kubernetes.io/use-regex: "true" }
+
+opendj:
+  resources:
+    storageClassName: *storage_class
+  image:
+    source: &ot_otds_registry "europe-north1-docker.pkg.dev/prime-cosmos-405311/otmm212"
+    tag: &otds_version 21.2.1
+
+otdsws:
+  publicHostname:
+  image:
+    name: otdsws_otmm
+    source: *ot_otds_registry
+    tag: *otds_version
+
+

@@ -1,0 +1,199 @@
+{{/*
+Make this file only relevant if we want to deploy a 
+OpenDJ container for OpenText Directory Services as part of this Helm Chart:
+*/}}
+{{- if eq .Values.enabled true }}
+
+########################################################################
+# OpenDJ
+########################################################################
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+{{- if eq .Values.global.otdsUseReleaseName true }}
+  name: {{ printf "%s-%s" .Release.Name .Chart.Name }}
+{{- else }}
+  name: {{ .Chart.Name }}
+{{- end }}
+{{- if .Values.global.namespace }}
+  namespace: {{ .Values.global.namespace }}
+{{- end }}
+  labels:
+    app.kubernetes.io/component: {{ .Chart.Name }}
+    {{- include (printf "%s%s" .Chart.Name ".labels" ) . | nindent 4 }}
+spec:
+{{- if eq .Values.global.otdsUseReleaseName true }}
+  serviceName: {{ printf "%s-%s" .Release.Name  .Values.serviceName }}
+{{- else }}
+  serviceName: {{ .Values.serviceName }}
+{{- end }}
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: {{ .Chart.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: {{ .Chart.Name }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      securityContext:
+        # The fsGroup field specifies that group ID {{ .Values.fsGroup }} is associated
+        # with all Containers in the Pod. Group ID {{ .Values.fsGroup }} is also
+        # associated with the mounted volumes and with any files created
+        # in that volume.
+        # This will make volumes be mounted with {{ .Values.fsGroup }} group permissions.
+        fsGroup: {{ .Values.fsGroup }}
+      containers:
+# Sidecar container
+{{- if eq .Values.backup.enable true }}      
+      - image: {{ .Values.backup.sidecarImage | quote }}
+        env:
+{{- with .Values.backup.sidecarEnv }}
+{{ tpl . $ | indent 10 }}
+{{- end }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+{{- if eq .Values.global.otdsUseReleaseName true }}
+        name: {{ printf "%s-%s-backup" .Release.Name .Chart.Name }}
+{{- else }}
+        name: {{ printf "%s-backup" .Chart.Name }}
+{{- end }}
+        volumeMounts:
+{{- if eq .Values.legacyOtdsData true }}
+        - mountPath: /opt/otds
+{{- else }}
+        - mountPath: /opt/opendj/data
+{{- end }}
+          name: {{ .Chart.Name }}-data          
+{{- if .Values.backup.sidecarCredSecret }}
+{{- if .Values.backup.sidecarCredSecretPath }}
+        - mountPath: {{ .Values.backup.sidecarCredSecretPath }}
+          name: {{ .Chart.Name }}-backup-cred
+{{- end }}
+{{- end }}
+{{- end }} 
+# OpenDJ container
+      - envFrom:
+        - secretRef:
+{{- if eq .Values.global.otdsUseReleaseName true }}
+            name: {{ printf "%s-%s" .Release.Name .Chart.Name }}-secrets
+{{- else }}
+            name: {{ .Chart.Name }}-secrets
+{{- end }}
+        readinessProbe:
+          exec:
+            command:
+            - cat
+            - /opt/opendj/online
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /opt/scripts/healthcheck.sh
+          periodSeconds: 10
+          timeoutSeconds: 5
+        image:  {{ printf "%s/%s:%s" $.Values.image.source $.Values.image.name $.Values.image.tag | quote }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+{{- if eq .Values.global.otdsUseReleaseName true }}
+        name: {{ printf "%s-%s" .Release.Name .Chart.Name }}
+{{- else }}
+        name: {{ .Chart.Name }}
+{{- end }}
+{{- if eq .Values.resources.enabled true }}
+        resources:
+          limits:
+            cpu: {{ .Values.resources.limits.cpu }}
+            memory: {{ .Values.resources.limits.memory }}
+          requests:
+            cpu: {{ .Values.resources.requests.cpu }}
+            memory: {{ .Values.resources.requests.memory }}
+{{- end }}
+        ports:
+        - containerPort: 1389
+        volumeMounts:
+{{- if eq .Values.legacyOtdsData true }}
+        - mountPath: /opt/otds
+{{- else }}
+        - mountPath: /opt/opendj/data
+{{- end }}
+          name: {{ .Chart.Name }}-data
+        env:
+{{- if eq .Values.legacyOtdsData true }}
+        - name: OPENDJ_DATA
+          value: /opt/otds/opendj
+{{- else }}
+        - name: OPENDJ_DATA
+          value: /opt/opendj/data
+{{- end }}
+        - name: REP_MASTER
+{{- if eq .Values.global.otdsUseReleaseName true }}
+          value: {{ printf "%s-%s" .Release.Name .Chart.Name }}-0
+{{- else }}
+          value: {{ .Chart.Name }}-0
+{{- end }}
+{{- if eq .Values.waitForData true }}
+        - name: DATA_LOAD
+          value: "true"
+{{- end }}
+{{- if .Values.jvmMemory }}
+        - name: JVM_MEMORY
+          value: {{ .Values.jvmMemory }}
+{{- else }}
+{{- if eq .Values.resources.enabled true }}
+{{- if .Values.resources.limits.memory }}
+        - name: JVM_MEMORY
+          value: {{ .Values.resources.limits.memory }}
+        - name: JVM_MEMORY_DETECTED
+          value: "true"
+{{- end }}
+{{- end }}
+{{- end }}
+#Backup environment
+{{- if eq .Values.backup.enable true }}
+        - name: ENABLE_BACKUP
+          value: "true"
+        - name: BACKUP_SCHEDULE
+          value: {{ .Values.backup.schedule | quote }}
+{{- if .Values.backup.customDirectory }}
+        - name: BACKUP_DIR
+          value: {{ .Values.backup.customDirectory | quote }}
+{{- end }}
+{{- if eq .Values.backup.dailyArchive true }}
+        - name: ARCHIVE_TIME
+          value: {{ .Values.backup.archiveTime | quote }}
+        - name: KEEP_ARCHIVES
+          value: {{ .Values.backup.keepArchives | quote }}
+{{- end }}
+{{- end }}
+      hostname: {{ .Values.hostname }}
+{{- if .Values.image.pullSecret }}
+      imagePullSecrets:
+      - name: {{ .Values.image.pullSecret }}
+{{- end }}
+{{- if .Values.backup.sidecarCredSecret }}
+{{- if .Values.backup.sidecarCredSecretPath }}
+      volumes:
+        - name: {{ .Chart.Name }}-backup-cred
+          secret:
+            secretName: {{ .Values.backup.sidecarCredSecret }}
+{{- end }}
+{{- end }}
+  volumeClaimTemplates:
+  - metadata:
+      name: {{ .Chart.Name }}-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+{{- if .Values.resources.storageClassName }}
+      storageClassName: {{ .Values.resources.storageClassName | quote }}
+{{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.resources.storage }}
+---
+
+{{- end }}

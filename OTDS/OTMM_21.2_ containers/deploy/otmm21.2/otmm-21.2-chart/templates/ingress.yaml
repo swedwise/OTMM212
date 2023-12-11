@@ -1,0 +1,399 @@
+---
+{{- if semverCompare .Values.global.kubeGitVersion .Capabilities.KubeVersion.GitVersion }}
+apiVersion: networking.k8s.io/v1
+{{- else }}
+apiVersion: extensions/v1beta1
+{{- end }}
+kind: Ingress
+metadata:
+  name: otmm-http-ingress
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+{{- if .Values.ingress.class }}
+    kubernetes.io/ingress.class: {{ .Values.ingress.class }}
+{{- end }}
+    ingress.kubernetes.io/ssl-passthrough: "false"
+{{- if .Values.global.secureEndpoints }}
+    kubernetes.io/ingress.allow-http: "false"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_input_headers "X-Forwarded-Proto: https";
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+{{- else }}
+    kubernetes.io/ingress.allow-http: "true"
+{{- end }}
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/affinity-mode: "persistent"
+    nginx.ingress.kubernetes.io/session-cookie-path: "/"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "{{ .Values.httpData.maxBodySize }}"
+    nginx.org/client-max-body-size: "{{ .Values.httpData.maxBodySize }}"
+spec:
+  rules:
+{{- if eq .Values.global.useDefaultExternalHost false }}
+{{ if .Values.global.publicHostName }}
+    - host: {{ .Values.global.publicHostName }}
+{{ else }}
+{{ if .Values.global.suffix }}
+    - host: {{ .Values.otmm.publicHost.baseName }}-{{ .Values.global.suffix }}.{{ required "A valid public domain is required" .Values.global.domain }}
+{{ else }}
+    - host: {{ .Values.otmm.publicHost.baseName }}.{{ required "A valid public domain is required" .Values.global.domain }}
+{{ end }}
+{{ end }}
+{{- else }}
+    - host:
+{{- end }}
+      http:
+        paths:
+{{- if semverCompare .Values.global.kubeGitVersion .Capabilities.KubeVersion.GitVersion }}
+          - path: /otmm
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.otmm.service.name }}
+                port:
+                  number: {{ .Values.otmm.service.port }}
+          - path: /teams
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.otmm.service.name }}
+                port:
+                  number: {{ .Values.otmm.service.port }}
+          - path: /deepzoom
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.otmm.service.name }}
+                port:
+                  number: {{ .Values.otmm.service.port }}
+          - path: /content
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.otmm.service.name }}
+                port:
+                  number: {{ .Values.otmm.service.port }}
+{{- else }}
+          - path: /otmm
+            backend:
+              serviceName: {{ .Values.otmm.service.name }}
+              servicePort: {{ .Values.otmm.service.port }}
+          - path: /teams
+            backend:
+              serviceName: {{ .Values.otmm.service.name }}
+              servicePort: {{ .Values.otmm.service.port }}
+          - path: /deepzoom
+            backend:
+              serviceName: {{ .Values.otmm.service.name }}
+              servicePort: {{ .Values.otmm.service.port }}
+          - path: /content
+            backend:
+              serviceName: {{ .Values.otmm.service.name }}
+              servicePort: {{ .Values.otmm.service.port }}
+{{- end }}
+---
+{{- if semverCompare .Values.global.kubeGitVersion .Capabilities.KubeVersion.GitVersion }}
+apiVersion: networking.k8s.io/v1
+{{- else }}
+apiVersion: extensions/v1beta1
+{{- end }}
+kind: Ingress
+metadata:
+  name: streaming-http-ingress
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+{{- if .Values.ingress.class }}
+    kubernetes.io/ingress.class: {{ .Values.ingress.class }}
+{{- end }}
+    ingress.kubernetes.io/ssl-passthrough: "false"
+{{- if .Values.global.secureEndpoints }}
+    kubernetes.io/ingress.allow-http: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+{{- else }}
+    kubernetes.io/ingress.allow-http: "true"
+{{- end }}
+spec:
+  rules:
+{{- if eq .Values.global.useDefaultExternalHost false }}
+{{ if .Values.global.publicHostName }}
+    - host: {{ .Values.global.publicHostName }}
+{{ else }}
+{{ if .Values.global.suffix }}
+    - host: {{ .Values.streaming.publicHost.baseName }}-{{ .Values.global.suffix }}.{{ required "A valid public domain is required" .Values.global.domain }}
+{{ else }}
+    - host: {{ .Values.streaming.publicHost.baseName }}.{{ required "A valid public domain is required" .Values.global.domain }}
+{{ end }}
+{{ end }}
+{{- else }}
+    - host:
+{{- end }}
+      http:
+        paths:
+{{- if semverCompare .Values.global.kubeGitVersion .Capabilities.KubeVersion.GitVersion }}
+          - path: /video
+            pathType: Prefix
+            backend:
+              service:
+                name: streaming
+                port:
+                  number: {{ .Values.streaming.service.port }}
+{{- else }}
+          - path: /video
+            backend:
+              serviceName: streaming
+              servicePort: {{ .Values.streaming.service.port }}
+{{- end }}
+
+---
+{{- if semverCompare .Values.global.kubeGitVersion .Capabilities.KubeVersion.GitVersion }}
+apiVersion: networking.k8s.io/v1
+{{- else }}
+apiVersion: extensions/v1beta1
+{{- end }}
+kind: Ingress
+metadata:
+  name: search-http-ingress
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+{{- if .Values.ingress.class }}
+    kubernetes.io/ingress.class: {{ .Values.ingress.class }}
+{{- end }}
+    ingress.kubernetes.io/ssl-passthrough: "false"
+{{- if .Values.global.secureEndpoints }}
+    kubernetes.io/ingress.allow-http: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+{{- else }}
+    kubernetes.io/ingress.allow-http: "true"
+{{- end }}
+spec:
+  rules:
+{{- if eq .Values.global.useDefaultExternalHost false }}
+{{ if .Values.global.publicHostName }}
+    - host: {{ .Values.global.publicHostName }}
+{{ else }}
+{{ if .Values.global.suffix }}
+    - host: {{ .Values.search.publicHost.baseName }}-{{ .Values.global.suffix }}.{{ required "A valid public domain is required" .Values.global.domain }}
+{{ else }}
+    - host: {{ .Values.search.publicHost.baseName }}.{{ required "A valid public domain is required" .Values.global.domain }}
+{{ end }}
+{{ end }}
+{{- else }}
+    - host:
+{{- end }}
+      http:
+        paths:
+{{- if semverCompare .Values.global.kubeGitVersion .Capabilities.KubeVersion.GitVersion }}
+          - path: /solr
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.search.service.name }}
+                port:
+                  number: {{ .Values.search.service.port }}
+{{- else }}
+          - path: /solr
+            backend:
+              serviceName: {{ .Values.search.service.name }}
+              servicePort: {{ .Values.search.service.port }}
+{{- end }}
+
+{{- if .Values.options.adaptivemedia }}
+---
+{{- if semverCompare .Values.global.kubeGitVersion .Capabilities.KubeVersion.GitVersion }}
+apiVersion: networking.k8s.io/v1
+{{- else }}
+apiVersion: extensions/v1beta1
+{{- end }}
+kind: Ingress
+metadata:
+  name: amd-http-ingress
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/affinity-mode: "persistent"
+    nginx.ingress.kubernetes.io/session-cookie-path: "/"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    ingress.kubernetes.io/ssl-passthrough: "false"
+{{- if .Values.ingress.class }}
+    kubernetes.io/ingress.class: {{ .Values.ingress.class }}
+{{- end }}
+{{- if .Values.global.secureEndpoints }}
+    kubernetes.io/ingress.allow-http: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+{{- else }}
+    kubernetes.io/ingress.allow-http: "true"
+{{- end }}
+spec:
+  rules:
+{{- if eq .Values.global.useDefaultExternalHost false }}
+{{ if .Values.global.publicHostName }}
+    - host: {{ .Values.global.publicHostName }}
+{{ else }}
+{{ if .Values.global.suffix }}
+    - host: {{ .Values.adaptivemedia.publicHost.baseName }}-{{ .Values.global.suffix }}.{{ required "A valid public domain is required" .Values.global.domain }}
+{{ else }}
+    - host: {{ .Values.adaptivemedia.publicHost.baseName }}.{{ required "A valid public domain is required" .Values.global.domain }}
+{{ end }}
+{{ end }}
+{{- else }}
+    - host:
+{{- end }}
+      http:
+        paths:
+{{- if semverCompare .Values.global.kubeGitVersion .Capabilities.KubeVersion.GitVersion }}
+          - path: /adaptivemedia
+            pathType: Prefix
+            backend:
+              service:
+                name: adaptivemedia
+                port:
+                  number: {{ .Values.adaptivemedia.service.port }}
+          - path: /adminservices
+            pathType: Prefix
+            backend:
+              service:
+                name: adaptivemedia
+                port:
+                  number: {{ .Values.adaptivemedia.service.port }}
+{{- else }}
+          - path: /adaptivemedia
+            backend:
+              serviceName: adaptivemedia
+              servicePort: {{ .Values.adaptivemedia.service.port }}
+          - path: /adminservices
+            backend:
+              serviceName: adaptivemedia
+              servicePort: {{ .Values.adaptivemedia.service.port }}
+{{- end }}
+{{- end }}
+
+{{- if .Values.options.digitalhub }}
+---
+{{- if semverCompare .Values.global.kubeGitVersion .Capabilities.KubeVersion.GitVersion }}
+apiVersion: networking.k8s.io/v1
+{{- else }}
+apiVersion: extensions/v1beta1
+{{- end }}
+kind: Ingress
+metadata:
+  name: dhub-http-ingress
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+{{- if .Values.ingress.class }}
+    kubernetes.io/ingress.class: {{ .Values.ingress.class }}
+{{- end }}
+    ingress.kubernetes.io/ssl-passthrough: "false"
+{{- if .Values.global.secureEndpoints }}
+    kubernetes.io/ingress.allow-http: "false"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_input_headers "X-Forwarded-Proto: https";
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+{{- else }}
+    kubernetes.io/ingress.allow-http: "true"
+{{- end }}
+    nginx.ingress.kubernetes.io/affinity: cookie
+    nginx.ingress.kubernetes.io/session-cookie-path: "/media"
+    nginx.ingress.kubernetes.io/affinity-mode: "persistent"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "{{ .Values.httpData.maxBodySize }}"
+    nginx.org/client-max-body-size: "{{ .Values.httpData.maxBodySize }}"
+spec:
+  rules:
+{{- if eq .Values.global.useDefaultExternalHost false }}
+{{ if .Values.global.publicHostName }}
+    - host: {{ .Values.global.publicHostName }}
+{{ else }}
+{{ if .Values.global.suffix }}
+    - host: {{ .Values.digitalhub.publicHost.baseName }}-{{ .Values.global.suffix }}.{{ required "A valid public domain is required" .Values.global.domain }}
+{{ else }}
+    - host: {{ .Values.digitalhub.publicHost.baseName }}.{{ required "A valid public domain is required" .Values.global.domain }}
+{{ end }}
+{{ end }}
+{{- else }}
+    - host:
+{{- end }}
+      http:
+        paths:
+{{- if semverCompare .Values.global.kubeGitVersion .Capabilities.KubeVersion.GitVersion }}
+          - path: /media
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.digitalhub.service.name }}
+                port:
+                  number: {{ .Values.digitalhub.service.port }}
+{{- else }}
+          - path: /media
+            backend:
+              serviceName: {{ .Values.digitalhub.service.name }}
+              servicePort: {{ .Values.digitalhub.service.port }}
+{{- end }}
+
+{{- end }}
+
+{{- if .Values.options.filetransfer }}
+---
+{{- if semverCompare .Values.global.kubeGitVersion .Capabilities.KubeVersion.GitVersion }}
+apiVersion: networking.k8s.io/v1
+{{- else }}
+apiVersion: extensions/v1beta1
+{{- end }}
+kind: Ingress
+metadata:
+  name: aft-http-ingress
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "{{ .Values.httpData.maxBodySize }}"
+    nginx.org/client-max-body-size: "{{ .Values.httpData.maxBodySize }}"
+{{- if .Values.ingress.class }}
+    kubernetes.io/ingress.class: {{ .Values.ingress.class }}
+{{- end }}
+    ingress.kubernetes.io/ssl-passthrough: "false"
+{{- if .Values.global.secureEndpoints }}
+    kubernetes.io/ingress.allow-http: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+{{- else }}
+    kubernetes.io/ingress.allow-http: "true"
+{{- end }}
+spec:
+  rules:
+{{- if eq .Values.global.useDefaultExternalHost false }}
+{{ if .Values.global.publicHostName }}
+    - host: {{ .Values.global.publicHostName }}
+{{ else }}
+{{ if .Values.global.suffix }}
+    - host: {{ .Values.aft.publicHost.baseName }}-{{ .Values.global.suffix }}.{{ required "A valid public domain is required" .Values.global.domain }}
+{{ else }}
+    - host: {{ .Values.aft.publicHost.baseName }}.{{ required "A valid public domain is required" .Values.global.domain }}
+{{ end }}
+{{ end }}
+{{- else }}
+    - host:
+{{- end }}
+      http:
+        paths:
+{{- if semverCompare .Values.global.kubeGitVersion .Capabilities.KubeVersion.GitVersion }}
+          - path: /qds
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.aft.service.name }}
+                port:
+                  number: {{ .Values.aft.service.port }}
+{{- else }}
+          - path: /qds
+            backend:
+              serviceName: {{ .Values.aft.service.name }}
+              servicePort: {{ .Values.aft.service.port }}
+{{- end }}
+
+{{- end }}

@@ -1,0 +1,24 @@
+
+rabbitmq:
+# Container Image configuration
+  container:
+    name: otmm_rabbitmq
+    tag: 3.8.14-management-alpine
+  service:
+    name: message-queue
+    type: ClusterIP
+    port: 5672
+    adminPort: 15672
+  publicHost:
+    baseName: rabbitmq
+
+# Storage configuration
+  storage:
+    class: *storage_class
+  replicaCount:
+    default: 1
+  ingress:
+    class: *ingress_class    
+  nodeSelector:
+    useNodeSelector: false    
+

@@ -1,0 +1,4 @@
+X-Frame-Options=SAMEORIGIN
+X-Content-Type-Options=nosniff
+X-UA-Compatible:IE=edge
+X-XSS-Protection=1; mode=block

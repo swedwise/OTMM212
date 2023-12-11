@@ -1,0 +1,61 @@
+########################################################################
+# Settings for OpenDJ
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+########################################################################
+
+## enabled controls if OTDS gets deployed as a container in
+## Kubernetes. If you have OTDS deployed somewhere else you can set
+## it to false.
+enabled: true
+## serviceName defines the name of the Kubernetes service for OpenDJ:
+serviceName: opendj
+## serviceType defines the type of the Kubernetes service for OpenDJ:
+serviceType: ClusterIP
+## hostname defines the hostname of the Kubernetes container for
+## OpenDJ (inside the stateful set definition):
+hostname: opendj
+## replicas for OpenDJ:
+replicas: 1
+## password of the OpenDJ Directory Manager account. Note that if persisting data the initial password
+## option will only have an impact on the first run that populates the volume.
+password: otds
+## otadminPassword is the password of the otadmin@otds.admin user for OTDS
+## Note that if persisting data the initial password option will only have
+## an impact on the first run that populates the volume.
+otadminPassword: otds
+## fsGroup defines the group ID in Linux that the OpenDJ Docker container
+## runs in and that the volumes are mounted with.
+## Normally you don't want to change it!
+fsGroup: 1000
+## legacyOtdsData should be enabled if using data originally from an OTDS container
+legacyOtdsData: false
+## waitForData should be enabled if data is being migrated from another container
+waitForData: false
+## jvmMemory sets the maximum amount of memory used by the otds-opendj JVM
+## If this value is not set, the JVM memory will be set to 50% of
+## resources.limits.memory if available otherwise 1.5GB
+## Memory amounts in M, Mi, G or Gi are supported
+jvmMemory:
+## image.* defines Docker image location, tags and pull parameters for
+## OpenDJ - you need to adjust this:
+image:
+  source: registry.opentext.com
+  name: otds-opendj
+  tag: 20.3.1
+  pullPolicy: Always
+  pullSecret: regcred
+## resource.* define the resource requirements for OpenDJ:
+resources:
+  enabled: true
+  requests:
+    cpu: 0.5
+    memory: 2Gi
+  limits:
+    cpu: 2
+    memory: 3Gi
+  ## storage defines the storage size for the OpenDJ data volume:
+  storage: 20G
+  ## storageClassName defines the Kubernetes storage class for the
+  ## OpenDJ volume:
+  storageClassName:

@@ -1,0 +1,16 @@
+############################################################
+## Persistent Volume Claims for rabbitMQ
+############################################################
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rabbitmq-pvc
+  namespace: {{ .Values.global.namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName:  {{ .Values.storage.class }}
+  resources:
+    requests:
+      storage: {{ .Values.resources.storage }}
+

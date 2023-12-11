@@ -1,0 +1,135 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: rabbitmq
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount.default }}
+  selector:
+    matchLabels:
+      run: rabbitmq
+  template:
+    metadata:
+      labels:
+        run: rabbitmq
+        release: {{ .Release.Name }}
+    spec:
+      hostname: otmmrabbitmq
+{{- if eq .Values.nodeSelector.useNodeSelector true }}
+      nodeSelector:
+        {{ .Values.nodeSelector.rabbitmq.nodeLabel }}
+{{- end }}
+      securityContext:
+        runAsUser: 100
+        fsGroup: 101
+      containers:
+      - name: rabbitmq
+        image: "{{ .Values.global.repository }}/{{ .Values.container.name }}:{{ .Values.container.tag }}"
+        securityContext:
+          runAsUser: 100
+          allowPrivilegeEscalation: false
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        resources:
+          requests:
+            cpu: {{ .Values.resources.requests.cpu }}
+            memory: {{ .Values.resources.requests.memory }}
+        envFrom:
+        - configMapRef:
+            name: otenv-configmap
+        ports:
+        - containerPort: {{ .Values.service.port }}
+        - containerPort: {{ .Values.service.adminPort }}
+
+        volumeMounts:
+        - name: rabbitmq-volume
+          mountPath: /var/lib/rabbitmq/mnesia
+        - name: otmm-secrets-volume
+          mountPath: /opt/rabbitmq/custom
+{{- if .Values.global.encryptionKey }}
+        - name: custom-encrypt-key-volume
+          mountPath: /opt/etc/key
+{{- end }}
+      volumes:
+      - name: rabbitmq-volume
+        persistentVolumeClaim:
+          claimName: rabbitmq-pvc
+      - name: otmm-secrets-volume
+        configMap:
+          name: otmm-secrets-configmap
+{{- if .Values.global.encryptionKey }}
+      - name: custom-encrypt-key-volume
+        configMap:
+          name: custom-encrypt-key-configmap
+{{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.name }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: queue
+      port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.port }}
+    - name: admin
+      port: {{ .Values.service.adminPort }}
+      targetPort: {{ .Values.service.adminPort }}
+  selector:
+    run: rabbitmq
+    release: {{ .Release.Name }}
+
+---
+{{- if semverCompare .Values.global.kubeGitVersion .Capabilities.KubeVersion.GitVersion }}
+apiVersion: networking.k8s.io/v1
+{{- else }}
+apiVersion: extensions/v1beta1
+{{- end }}
+kind: Ingress
+metadata:
+  name: rabbitmq-http-ingress
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    ingress.kubernetes.io/ssl-passthrough: "false"
+    kubernetes.io/ingress.allow-http: "true"
+{{- if .Values.ingress.class }}
+    kubernetes.io/ingress.class: {{ .Values.ingress.class }}
+{{- end }}
+spec:
+  rules:
+{{- if eq .Values.global.useDefaultExternalHost false }}
+{{ if .Values.global.publicHostName }}
+    - host: {{ .Values.global.publicHostName }}
+{{ else }}
+{{ if .Values.global.suffix }}
+    - host: {{ .Values.publicHost.baseName }}-{{ .Values.global.suffix }}.{{ required "A valid public domain is required" .Values.global.domain }}
+{{ else }}
+    - host: {{ .Values.publicHost.baseName }}.{{ required "A valid public domain is required" .Values.global.domain }}
+{{ end }}
+{{ end }}
+{{- else }}
+    - host:
+{{- end }}
+      http:
+        paths:
+{{- if semverCompare .Values.global.kubeGitVersion .Capabilities.KubeVersion.GitVersion }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.service.name }}
+                port:
+                  number: {{ .Values.service.adminPort }}
+{{- else }}
+          - path: /
+            backend:
+              serviceName: {{ .Values.service.name }}
+              servicePort: {{ .Values.service.adminPort }}
+{{- end }}
+

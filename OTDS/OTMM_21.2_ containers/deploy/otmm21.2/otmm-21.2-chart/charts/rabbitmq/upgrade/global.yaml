@@ -1,0 +1,8 @@
+  encryptionKey: false
+  repository: &ot_otmm_registry 
+  imagePullPolicy: Always
+  # Apply public hostname to ingress
+  useDefaultExternalHost: false
+  # Use a single public hostname for all services
+  publicHostName: 
+

@@ -1,0 +1,93 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ .Values.otmm.service.name }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  type: {{ .Values.otmm.service.type }}
+  sessionAffinity: ClientIP
+  ports:
+  - name: http
+    port: {{ .Values.otmm.service.port }}
+    targetPort: {{ .Values.otmm.service.port }}
+  - name: ejbd
+    port: {{ .Values.otmm.service.ejbdPort }}
+    targetPort: {{ .Values.otmm.service.ejbdPort }}
+  selector:
+    run: otmm
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.transcode.service.name }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  type: {{ .Values.transcode.service.type }}
+  ports:
+    - name: {{ .Values.transcode.service.port | quote }}
+      port: {{ .Values.transcode.service.port }}
+      targetPort: {{ .Values.transcode.service.port }}
+  selector:
+    run: dmts-service
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.search.service.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: search
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  type: {{ .Values.search.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.search.service.port }}
+  selector:
+    app: search-master
+    release: {{ .Release.Name }}
+
+{{- if gt (.Values.replicaCount.searchSecondary | int64) 0 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.search.service.secondary.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: search
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  type: {{ .Values.search.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.search.service.port }}
+  selector:
+    app: search-secondary
+    release: {{ .Release.Name }}
+
+{{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.streaming.service.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: streaming
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  type: {{ .Values.streaming.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.streaming.service.port }}
+  selector:
+    app: streaming
+    release: {{ .Release.Name }}
+

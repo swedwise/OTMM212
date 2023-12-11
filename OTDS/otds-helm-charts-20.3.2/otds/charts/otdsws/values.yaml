@@ -1,0 +1,77 @@
+########################################################################
+# Settings for OpenText Directory Services (OTDS)
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+########################################################################
+
+## enabled controls if OTDS gets deployed as a container in
+## Kubernetes. If you have OTDS deployed somewhere else you can set
+## it to false.
+enabled: true
+## ingress enables Kubernetes Ingress for OTDS
+ingress: 
+  enabled: true
+  secret: 
+## serviceName defines the name of the Kubernetes service for OTDS:
+serviceName: otdsws
+## replicas for OTDS should always be 1:
+replicas: 1
+## port defines the external port for the OTDS Kubernetes service:
+port: 80
+## targetPort defines the internal container port for the
+## OTDS Kubernetes service:
+targetPort: 8080
+## protocol: communication protocol - used in config map
+protocol: http
+## portProtocol is the protocol the OTDS Kubernetes service is using:
+portProtocol: TCP
+## publicHostname defines the FQDN or IP address of the
+## Kubernetes Services of OTDS. If empty ("") the hostname
+## will dynamically be determinded via the Kubernetes API.
+publicHostname:
+## cryptKey is used for secure synchronized access to OpenDJ from 
+## frontent instances
+## The value is a 16 character ASCII string that has been base64 encoded
+cryptKey: Z2hkN2hyNDBkbWNGcVQ0TA==
+## additionalJavaOpts defines additional Java parameters for OTDS 
+additionalJavaOpts:
+## enable the use of the config.yml file in the otdsws chart directory
+## to apply a specific set of configuration options on startup
+## A sample config.yml file is in the otdsws chart directory
+enableBootstrapConfig: false
+## jvmMemory sets the maximum amount of memory used by the otds-server JVM
+## If this value is not set, the JVM memory will be set to 75% of
+## resources.limits.memory if available otherwise 512MB
+## Memory amounts in M, Mi, G or Gi are supported
+jvmMemory:
+## opendj.* defines the connection information for the OpenDJ which
+## is the backend data storage location for OTDS
+opendj:
+  ## serviceName defines the name of the Kubernetes service for OpenDJ:
+  serviceName: opendj
+  ## port defines the external port for the OpenDJ Kubernetes service:
+  port: 1389
+  password: otds
+## image.* defines Docker image location, tags and pull parameters for
+## OTDS - you need to adjust this:
+image:
+  source: registry.opentext.com
+  name: otds-server
+  tag: 20.3.1
+  pullPolicy: Always
+  pullSecret: regcred
+## resource.* define the resource requirements for OTDS:
+resources:
+  enabled: true
+  requests:
+    cpu: 0.5
+    memory: 1Gi
+  limits:
+    cpu: 2
+    memory: 1.5Gi
+  ## storage defines the storage size for the OTDS server volume:
+  storage: 20Mi
+  ## storageClasame defines the Kubernetes storage class for the
+  ## OTDS server volume:
+  storageClassName:
+

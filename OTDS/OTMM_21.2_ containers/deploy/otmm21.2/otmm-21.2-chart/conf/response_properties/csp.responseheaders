@@ -1,0 +1,3 @@
+Strict-Transport-Security: max-age=31536000
+Content-Security-Policy=default-src 'self' $WS_OTMM_URL$ $MBIR_SERVER_URL$ $WEB_APPS_BASE_URL$ QDS_PROPERTIES; script-src 'self' $AFT_EXTERNAL_URL$ $MBIR_SERVER_URL$ 'unsafe-inline' 'unsafe-eval'; img-src 'self' https://api.spaces.hightail.com blob: $MBIR_SERVER_URL$ $WEB_APPS_BASE_URL$ data: $OTDS_BASE_URL$; media-src $STREAM_BASE_URL$; style-src 'self' 'unsafe-inline' $MBIR_SERVER_URL$ $OTDS_BASE_URL$; font-src 'self' $MBIR_SERVER_URL$ data: ;
+

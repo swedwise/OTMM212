@@ -1,0 +1,44 @@
+{{- if eq .Values.ingress.enabled true }}
+
+########################################################################
+# Kubernetes Ingress for OTDS
+# External Interface to provide a Fully Qualified Domain Name (FQDN)
+# and enable secure HTTPS communication (if ingress.secret is provided)
+########################################################################
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+{{- if eq .Values.global.otdsUseReleaseName true }}
+  name: {{ printf "%s-%s" .Release.Name .Chart.Name }}-ingress
+{{- else }}
+  name: {{ .Chart.Name }}-ingress
+{{- end }}
+{{- if .Values.global.namespace }}
+  namespace: {{ .Values.global.namespace }}
+{{- end }}
+  annotations:
+{{- if .Values.ingress.class }}
+    kubernetes.io/ingress.class: {{ .Values.ingress.class }}
+{{- end }}
+{{- range $key, $value := .Values.ingress.annotations }}
+    {{ $key }}: {{ $value | squote }}
+{{- end }}
+spec:
+{{- if .Values.ingress.secret }}
+  tls:
+    - secretName: {{ .Values.ingress.secret }}
+{{- end }}
+  rules:
+    - host: {{ .Values.otdsws.publicHostname }}
+      http:
+        paths:
+          - backend:
+{{- if eq .Values.global.otdsUseReleaseName true }}
+              serviceName: {{ printf "%s-%s" .Release.Name .Values.otdsws.serviceName }}
+{{- else }}
+              serviceName: {{ .Values.otdsws.serviceName }}
+{{- end }}
+              servicePort: {{ .Values.otdsws.port }}
+---
+
+{{- end }}

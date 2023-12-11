@@ -1,0 +1,36 @@
+global:
+  namespace: default
+  storage:
+    class: nfs-client
+    rabbitmq: 500Mi
+    
+  imagePullPolicy:  IfNotPresent
+  rabbitmq:
+    source: 
+replicaCount:
+  default: 1
+ingress:
+  enabled: true
+  secret:
+  class:
+  annotations: {}
+
+
+container:
+  name: rabbitmq
+  tag: 3.8.14-management-alpine
+service:
+  name: message-queue
+  type: NodePort
+  port: 5672
+  adminPort: 15672
+publicHost:
+  baseName: rabbitmq
+
+nodeSelector:
+  useNodeSelector: false
+
+configmap:
+  RABBITMQ_IO_THREAD_POOL_SIZE: "128"
+  RABBITMQ_DEFAULT_ALLOC_ARGS: "+MBas ageffcbf +MHas ageffcbf +MBlmbcs 512 +MHlmbcs 512 +MMmcs 30"
+  

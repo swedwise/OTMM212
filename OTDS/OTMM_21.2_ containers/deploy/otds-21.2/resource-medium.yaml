@@ -1,0 +1,18 @@
+# --MEDIUM PRODUCTION Standard --
+#
+
+otdsws:
+  resources:
+    requests:
+      cpu: 1
+      memory: 1Gi
+  jvmMemory: 1Gi
+
+opendj:
+  resources:
+    requests:
+      cpu: 1
+      memory: 2Gi
+    storage: 20Gi
+  jvmMemory: 2Gi
+

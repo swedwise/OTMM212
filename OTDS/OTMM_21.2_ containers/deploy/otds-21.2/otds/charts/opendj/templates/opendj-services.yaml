@@ -1,0 +1,36 @@
+{{/*
+Make this file only relevant if we want to deploy an 
+OpenDJ container for OpenText Directory Services as part of this Helm Chart:
+*/}}
+{{- if eq .Values.enabled true }}
+
+########################################################################
+# OpenDJ Kubernetes Service
+########################################################################
+kind: Service
+apiVersion: v1
+metadata:
+{{- if eq .Values.global.otdsUseReleaseName true }}
+  name: {{ printf "%s-%s" .Release.Name .Values.serviceName }}
+{{- else }}
+  name: {{ .Values.serviceName }}
+{{- end }}
+{{- if .Values.global.namespace }}
+  namespace: {{ .Values.global.namespace }}
+{{- end }}
+  labels:
+    {{- include (printf "%s%s" .Chart.Name ".labels" ) . | nindent 4 }}
+spec:
+  type: {{ .Values.serviceType }}
+  ports:
+  - name: {{ .Chart.Name }}
+    protocol: TCP
+    port: 1389
+    targetPort: 1389
+  selector:
+    app.kubernetes.io/component: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  sessionAffinity: ClientIP
+---
+
+{{- end }}

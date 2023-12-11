@@ -1,0 +1,235 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otmm-configmap
+  namespace:  {{ .Values.global.namespace }}
+data:
+{{- range $key, $val := .Values.configmaps }}
+  {{ $key }}: |-
+{{ $val | indent 4 }}
+{{- end }}
+{{- if .Values.global.useDefaultExternalHost }}
+  EXTERNAL_DEFAULT_HOST: {{ .Values.global.publicHostName }}
+{{- end }}
+{{- if .Values.options.filetransfer }}
+  USE_AFT: "true"
+  AFT_HOST: {{ .Values.aft.service.name }}
+  {{- if eq .Values.global.useDefaultExternalHost false }}
+  {{ if .Values.global.publicHostName }}
+  AFT_EXTERNAL_HOST: {{ .Values.global.publicHostName }}
+  {{ else }}
+  {{ if .Values.global.suffix }}
+  AFT_EXTERNAL_HOST:  {{ .Values.aft.publicHost.baseName }}-{{ .Values.global.suffix }}.{{ required "A valid public domain is required" .Values.global.domain }}
+  {{ else }}
+  AFT_EXTERNAL_HOST:  {{ .Values.aft.publicHost.baseName }}.{{ required "A valid public domain is required" .Values.global.domain }}
+  {{ end }}
+  {{ end }}
+  {{- end }}
+{{- else }}
+  USE_AFT: "false"
+{{- end }}
+{{- if .Values.options.adaptivemedia }}
+  {{- if eq .Values.global.useDefaultExternalHost false }}
+  {{ if .Values.global.publicHostName }}
+  AMD_EXTERNAL_HOST: {{ .Values.global.publicHostName }}
+  {{ else }}
+  {{ if .Values.global.suffix }}
+  AMD_EXTERNAL_HOST:  {{ .Values.adaptivemedia.publicHost.baseName }}-{{ .Values.global.suffix }}.{{ required "A valid public domain is required" .Values.global.domain }}
+  {{ else }}
+  AMD_EXTERNAL_HOST:  {{ .Values.adaptivemedia.publicHost.baseName }}.{{ required "A valid public domain is required" .Values.global.domain }}
+  {{ end }}
+  {{ end }}
+  {{- end }}
+{{- end }}
+{{- if .Values.options.digitalhub }}
+  {{- if eq .Values.global.useDefaultExternalHost false }}
+  {{ if .Values.global.publicHostName }}
+  DHUB_EXTERNAL_HOST: {{ .Values.global.publicHostName }}
+  {{ else }}
+  {{ if .Values.global.suffix }}
+  DHUB_EXTERNAL_HOST: {{ .Values.digitalhub.publicHost.baseName }}-{{ .Values.global.suffix }}.{{ required "A valid public domain is required" .Values.global.domain }}
+  {{ else }}
+  DHUB_EXTERNAL_HOST: {{ .Values.digitalhub.publicHost.baseName }}.{{ required "A valid public domain is required" .Values.global.domain }}
+  {{ end }}
+  {{ end }}
+  {{- end }}
+  ENABLE_DHUB: "true"
+  DHUB_HOST: {{ .Values.digitalhub.service.name }}
+  DHUB_PORT: "{{ .Values.digitalhub.service.port }}"
+{{- end }}
+{{- if .Values.options.mediaanalysis }}
+  RMA_PORT: "{{ .Values.mediaanalysis.service.port }}"
+  ENABLE_RMA: "true"
+{{- end }}
+{{- if eq .Values.javaOptions.proxy true }}
+  OTMM_JAVA_OPTS: "{{ .Values.javaOptions.otmmjvmopts }} -Dhttps.proxyHost={{ .Values.javaOptions.proxyhost }} -Dhttps.proxyPort={{ .Values.javaOptions.proxyport }} -Dhttp.nonProxyHosts=\"{{ .Values.javaOptions.noproxy }}\""
+  RMA_JAVA_OPTS: "{{ .Values.javaOptions.rmajvmopts }} -Dhttps.proxyHost={{ .Values.javaOptions.proxyhost }} -Dhttps.proxyPort={{ .Values.javaOptions.proxyport }} -Dhttp.nonProxyHosts=\"{{ .Values.javaOptions.noproxy }}\""
+{{- else }}
+  OTMM_JAVA_OPTS: "{{ .Values.javaOptions.otmmjvmopts }}"
+  RMA_JAVA_OPTS: "{{ .Values.javaOptions.rmajvmopts }}"
+{{- end }}
+  AMD_JAVA_OPTS: "{{ .Values.javaOptions.amdjvmopts }}"
+  DH_JAVA_OPTS: "{{ .Values.javaOptions.dhubjvmopts }}"
+  DMTS_IMAGE_JAVA_OPTS: "{{ .Values.javaOptions.dmts.imagejvmopts }}"
+  DMTS_VIDEO_JAVA_OPTS: "{{ .Values.javaOptions.dmts.videojvmopts }}"
+  DMTS_SERVICE_JAVA_OPTS: "{{ .Values.javaOptions.dmts.servicejvmopts }}"
+  INDEXER_JAVA_OPTS: "{{ .Values.javaOptions.indexjvmopts }}"
+  SUPPORT_JAVA_OPTS: "{{ .Values.javaOptions.supportjvmopts }}"
+{{- if eq .Values.global.useNewRelic "true" }}             
+{{- if eq .Values.javaOptions.proxy true }}          
+  NEW_RELIC_PROXY_HOST: "{{ .Values.javaOptions.proxyhost }}"   
+  NEW_RELIC_PROXY_PORT: "{{ .Values.javaOptions.proxyport }}"  
+{{- end }}  
+{{- end }}    
+{{- if eq .Values.global.useDefaultExternalHost false }}
+  OTDS_EXTERNAL_HOST: {{ .Values.ingress.otds.host }}
+{{ if .Values.global.publicHostName }}
+  OTMM_EXTERNAL_HOST: {{ .Values.global.publicHostName }}
+  STREAM_EXTERNAL_HOST: {{ .Values.global.publicHostName }}
+{{ else }}
+{{ if .Values.global.suffix }}
+  OTMM_EXTERNAL_HOST: {{ .Values.otmm.publicHost.baseName }}-{{ .Values.global.suffix }}.{{ required "A valid public domain is required" .Values.global.domain }}
+  STREAM_EXTERNAL_HOST: {{ .Values.streaming.publicHost.baseName }}-{{ .Values.global.suffix }}.{{ required "A valid public domain is required" .Values.global.domain }}
+{{ else }}
+  OTMM_EXTERNAL_HOST: {{ .Values.otmm.publicHost.baseName }}.{{ required "A valid public domain is required" .Values.global.domain }}
+  STREAM_EXTERNAL_HOST: {{ .Values.streaming.publicHost.baseName }}.{{ required "A valid public domain is required" .Values.global.domain }}
+{{ end }}
+{{ end }}
+{{- end }}  
+{{- if .Values.ingress.mbir.host }}
+  USE_MBIR: "true"
+  MBIR_EXTERNAL_HOST: {{ .Values.ingress.mbir.host }}
+{{- end }}
+{{- if .Values.options.postgres }}
+  DB_TYPE: POSTGRESQL
+  DATABASE_HOST: {{ .Values.database.service.name }}
+  DATABASE_PORT: "{{ .Values.database.service.port }}"
+{{- else }}
+  DB_TYPE: {{ .Values.database.type }} 
+  DATABASE_HOST: {{ .Values.database.host }}
+  DATABASE_PORT: "{{ .Values.database.port }}"
+{{- end }}
+{{- if .Values.global.secureEndpoints }}
+  USE_SSL: "true"
+{{- else }}
+  USE_SSL: "false"
+{{- end }}
+{{- if gt (.Values.replicaCount.searchSecondary | int64) 0 }}
+  SOLR_HA: "ON"
+{{- else }}
+  SOLR_HA: "OFF"
+{{- end }}
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }} 
+{{- if $globcustomkey }}         
+  ENCRYPTION_KEY_IMPLEMENTATION_CLASS: "com.artesia.common.encryption.key.FileSystemSecretKey"
+  ENCRYPTION_KEY_FILE_PATH: /opt/etc/key/key.txt
+{{- end }}
+{{ if .Values.configmaps.DB_TABLESPACE_PREFIX }}
+  DB_USE_DEFAULT_TABLESPACE: "false"
+{{ else }}
+  DB_USE_DEFAULT_TABLESPACE: "true"
+{{ end }}
+
+  OTDS_PORT: "80"
+  OTDS_HOST: "otdsws"
+  OTMM_HOST: {{ .Values.otmm.service.name }}
+  RABBITMQ_HOST: {{ .Values.rabbitmq.service.name }}
+  RMA_RABBITMQ_HOST: {{ .Values.rabbitmq.service.name }}
+  RABBITMQ_SERVICE_HOST: {{ .Values.rabbitmq.service.name }}
+  RABBITMQ_SERVICE_PORT: "{{ .Values.rabbitmq.service.port }}"
+  DMTS_FILESHARE_ROOTFOLDER: /var/input_volume
+  SOLR_MASTER_HOST: {{ .Values.search.service.name }}
+  SOLR_MASTER_PORT: "{{ .Values.search.service.port }}"
+  SOLR_SECONDARY_HOST: {{ .Values.search.service.secondary.name }}
+  SOLR_JAVA_MEM: "{{ .Values.javaOptions.searchjvmopts }}"
+  SUPPORTMGR_PORT: "{{ .Values.supportmgr.service.port }}"
+  SUPPORTMGR_HOST: {{ .Values.supportmgr.service.name }}
+  USE_SUPPORTMGR: "{{ .Values.options.supportmgr }}"
+  SERVER_PORT: "8080"
+  BUILD_VERSION: "{{ .Chart.Version }}"
+
+---  
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otmm-secrets-configmap
+  namespace:  {{ .Values.global.namespace }}
+binaryData:
+  sec.cfg: |-
+    {{ .Files.Get "conf/vault/sec.cfg" | b64enc }}
+
+ 
+# apply custom encrypt key
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }} 
+{{- if $globcustomkey }}         
+--- 
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-encrypt-key-configmap
+  namespace:  {{ .Values.global.namespace }}
+binaryData:
+  key.txt: |-
+    {{ .Files.Get "conf/vault/key.txt" | b64enc }}  
+
+{{- end }}
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otmm-responseheader-configmap
+  namespace:  {{ .Values.global.namespace }}
+data:
+{{ (.Files.Glob "conf/response_properties/*").AsConfig | indent 2 }}
+
+---  
+
+# apply Licenses
+{{- $globlicense := .Files.Glob "conf/licenses/*" }}
+{{- if $globlicense }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otmm-license-configmap
+  namespace:  {{ .Values.global.namespace }}
+data:
+  license: |-
+    {{ .Files.Get "conf/licenses/license" }}
+binaryData:
+  license.dat: |-
+    {{ .Files.Get "conf/licenses/license.dat" | b64enc }}
+
+{{- end }}
+
+# custom post-deployment scripts
+{{- $globscripts := .Files.Glob "conf/scripts/*" }}
+{{- if $globscripts }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otmm-scripts-configmap
+  namespace:  {{ .Values.global.namespace }}
+binaryData:
+{{- range $path, $bytes := .Files.Glob "conf/scripts/*" }}
+  {{ base $path }}: |-
+    {{ $.Files.Get $path | b64enc }}
+{{- end }}
+{{- end }}
+
+# apply internal user type
+{{- $globinternalusertype := .Files.Glob "conf/internal/user_types.sql" }} 
+{{- if $globinternalusertype }}         
+--- 
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: internal-user-types-configmap
+  namespace:  {{ .Values.global.namespace }}
+binaryData:
+  user_types.sql: |-
+    {{ .Files.Get "conf/internal/user_types.sql" | b64enc }}  
+
+{{- end }}

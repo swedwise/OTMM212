@@ -1,0 +1,147 @@
+{{/*
+Make this file only relevant if we want to deploy a 
+OTDS Web Services container for OpenText Directory Services as part of this Helm Chart:
+*/}}
+{{- if eq .Values.enabled true }}
+
+########################################################################
+# OpenText Directory Services (OTDS)
+########################################################################
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+{{- if eq .Values.global.otdsUseReleaseName true }}
+  name: {{ printf "%s-%s" .Release.Name .Chart.Name }}
+{{- else }}
+  name: {{ .Chart.Name }}
+{{- end }}
+{{- if .Values.global.namespace }}
+  namespace: {{ .Values.global.namespace }}
+{{- end }}
+  labels:
+    app.kubernetes.io/component: {{ .Chart.Name }}
+    {{- include (printf "%s%s" .Chart.Name ".labels" ) . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: {{ .Chart.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: {{ .Chart.Name }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+{{- if eq .Values.enableBootstrapConfig true }}
+      volumes:
+{{- if eq .Values.global.otdsUseReleaseName true }}
+        - name: {{ printf "%s-%s" .Release.Name .Chart.Name }}-bootstrap-volume
+          secret:
+            secretName: {{ printf "%s-%s" .Release.Name .Chart.Name }}-bootstrap
+        - name: {{ printf "%s-%s" .Release.Name .Chart.Name }}-bootstrap-config-volume
+          persistentVolumeClaim:
+            claimName: {{ printf "%s-%s" .Release.Name .Chart.Name }}-bootstrap-config
+{{- else }}
+        - name: {{ .Chart.Name }}-bootstrap-volume
+          secret:
+            secretName: {{ .Chart.Name }}-bootstrap
+        - name: {{ .Chart.Name }}-bootstrap-config-volume
+          persistentVolumeClaim:
+            claimName: {{ .Chart.Name }}-bootstrap-config
+{{- end }}      
+
+{{- end }}
+      containers:
+      - envFrom:
+        - secretRef:
+{{- if eq .Values.global.otdsUseReleaseName true }}
+            name: {{ printf "%s-%s" .Release.Name .Chart.Name }}-secrets
+{{- else }}
+            name: {{ .Chart.Name }}-secrets
+{{- end }}
+{{- if eq .Values.enableBootstrapConfig true }}
+        volumeMounts:
+{{- if eq .Values.global.otdsUseReleaseName true }}
+          - name: {{ printf "%s-%s" .Release.Name .Chart.Name }}-bootstrap-config-volume
+{{- else }}
+          - name: {{ .Chart.Name }}-bootstrap-config-volume
+{{- end }} 
+            mountPath: /opt/config
+{{- if eq .Values.global.otdsUseReleaseName true }}
+          - name: {{ printf "%s-%s" .Release.Name .Chart.Name }}-bootstrap-volume
+{{- else }}
+          - name: {{ .Chart.Name }}-bootstrap-volume
+{{- end }} 
+            mountPath: /opt/config/bootstrap
+{{- end }}
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /opt/scripts/healthcheck.sh
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /opt/scripts/healthcheck.sh
+          initialDelaySeconds: 240
+          periodSeconds: 10
+          timeoutSeconds: 5
+        image: {{ printf "%s/%s:%s" $.Values.image.source $.Values.image.name $.Values.image.tag | quote }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+{{- if eq .Values.global.otdsUseReleaseName true }}
+        name: {{ printf "%s-%s" .Release.Name .Chart.Name }}
+{{- else }}
+        name: {{ .Chart.Name }}
+{{- end }}
+        env:
+        - name: OTDS_DIRECTORY_BOOTSTRAP_SERVERLIST
+{{- if eq .Values.global.otdsUseReleaseName true }}
+          value: {{ printf "ldap://%s-%s" .Release.Name .Values.opendj.serviceName }}:{{ .Values.opendj.port }}
+{{- else }}
+          value: {{ printf "ldap://%s" .Values.opendj.serviceName }}:{{ .Values.opendj.port }}
+{{- end }}
+{{- if .Values.additionalJavaOpts }}
+        - name: CATALINA_OPTS
+          value: {{ .Values.additionalJavaOpts }}
+{{- end }}
+{{- if .Values.jvmMemory }}
+        - name: JVM_MEMORY
+          value: {{ .Values.jvmMemory }}
+{{- else }}
+{{- if eq .Values.resources.enabled true }}
+{{- if .Values.resources.limits.memory }}
+        - name: JVM_MEMORY
+          value: {{ .Values.resources.limits.memory }}
+        - name: JVM_MEMORY_DETECTED
+          value: "true"
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if eq .Values.carrierGradeNAT true }}
+        - name: CARRIER_GRADE_NAT
+          value: "true"
+{{- end }}
+{{- if eq .Values.resources.enabled true }}
+        resources:
+          limits:
+            cpu: {{ .Values.resources.limits.cpu }}
+            memory: {{ .Values.resources.limits.memory }}
+          requests:
+            cpu: {{ .Values.resources.requests.cpu }}
+            memory: {{ .Values.resources.requests.memory }}
+{{- end }}
+        ports:
+        - containerPort: {{ .Values.targetPort }}
+      hostname: {{ .Values.hostname }}
+{{- if .Values.image.pullSecret }}
+      imagePullSecrets:
+      - name: {{ .Values.image.pullSecret }}
+{{- end }}
+{{- end }}

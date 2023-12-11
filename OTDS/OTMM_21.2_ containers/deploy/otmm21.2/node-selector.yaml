@@ -1,0 +1,31 @@
+
+nodeSelector:
+  adaptivemedia:
+    nodeLabel: "<key: value pair of the node label for AMD pod deployment, example: dedicated: node1>"
+  otmm:
+    nodeLabel: "<key: value pair of the node label for OTMM pod deployment>"
+  search:
+    master:
+      nodeLabel: "<key: value pair of the node label for search master pod deployment>"
+    secondary:
+      nodeLabel: "<key: value pair of the node label for search secondary pod deployment>"
+  indexer:
+    nodeLabel: "<key: value pair of the node label for indexer pod deployment>"
+  streaming:
+    nodeLabel: "<key: value pair of the node label for httpd streaming pod deployment>"
+  digitalhub:
+    nodeLabel: "<key: value pair of the node label for digitalhub UI pod deployment>"
+  aft:
+    nodeLabel: "<key: value pair of the node label for advanced file transfer pod deployment>"
+  dmts:
+    service:
+      nodeLabel: "<key: value pair of the node label for DMTS service pod deployment>"
+    image:
+      nodeLabel: "<key: value pair of the node label for DMTS image pod deployment>"
+    video:
+      nodeLabel: "<key: value pair of the node label for DMTS video pod deployment>"
+  mediaanalysis:
+    nodeLabel: "<key: value pair of the node label for media analysis pod deployment>"
+  supportmgr:
+    nodeLabel: "<key: value pair of the node label for support manager pod deployment>"
+

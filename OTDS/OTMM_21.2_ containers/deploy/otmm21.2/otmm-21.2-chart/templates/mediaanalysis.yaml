@@ -1,0 +1,108 @@
+{{- if .Values.options.mediaanalysis }}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rma
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: rma
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount.mediaanalysis }}
+  selector:
+    matchLabels:
+      app: rma
+  template:
+    metadata:
+      labels:
+        app: rma
+        release: {{ .Release.Name }}
+    spec:
+{{- if eq .Values.nodeSelector.useNodeSelector true }}
+      nodeSelector:
+        {{ .Values.nodeSelector.mediaanalysis.nodeLabel }}
+{{- end }}
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+      containers:
+      - name: rma
+        image: "{{ .Values.global.repository }}/{{ .Values.mediaanalysis.container.name }}:{{ .Values.mediaanalysis.container.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+        resources:
+          requests:
+            memory: {{ .Values.memory.mediaanalysis }}
+            cpu: {{ .Values.cpu.mediaanalysis }}
+        env:
+        - name: _JAVA_OPTIONS
+          value: "$(RMA_JAVA_OPTS)" 
+{{- if eq .Values.global.useNewRelic "true" }}             
+        - name: NEW_RELIC_APP_NAME
+          value: "{{ .Values.mediaanalysis.service.name }}-{{ .Values.global.namespace }}.$(CF_BASE_URL)"
+{{- end }}
+        envFrom:
+        - configMapRef:
+            name: otmm-configmap
+        ports:
+        - containerPort: {{ .Values.mediaanalysis.service.port }}
+        readinessProbe:
+          httpGet:
+            path: /rest/analytics/ping
+            port: {{ .Values.mediaanalysis.service.port }}
+          initialDelaySeconds: 60
+          failureThreshold: 10
+          periodSeconds: 20
+          timeoutSeconds: 10  
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /opt/RMA/bin/liveness_probe.sh init_rma.sh
+          initialDelaySeconds: 60
+          failureThreshold: 10
+          periodSeconds: 20
+          timeoutSeconds: 10  
+        volumeMounts:
+        - name: otmm-secrets-volume
+          mountPath: /opt/RMA/custom
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }}
+{{- if $globcustomkey }}
+        - name: custom-encrypt-key-volume
+          mountPath: /opt/etc/key
+{{- end }}
+      volumes:
+      - name: otmm-secrets-volume
+        configMap:
+          name: otmm-secrets-configmap
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }}
+{{- if $globcustomkey }}
+      - name: custom-encrypt-key-volume
+        configMap:
+          name: custom-encrypt-key-configmap
+{{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.mediaanalysis.service.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: rma
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  type: {{ .Values.mediaanalysis.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.mediaanalysis.service.port }}
+  selector:
+    app: rma
+    release: {{ .Release.Name }}
+
+{{- end }}

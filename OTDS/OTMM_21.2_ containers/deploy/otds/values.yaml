@@ -1,0 +1,223 @@
+########################################################################
+# Default values for Helm Chart otds (OpenText Directory Services).
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+#
+# This Helm Chart for OpenText Directory Services includes 2 subcharts:
+# - otdsws - OpenText Directory Services frontend
+# - opendj - OpenText Directory Services backend
+#
+# These charts have their own values.yaml but you should just change
+# this one - it overwrites the defaults in the subcharts.
+#
+########################################################################
+global:
+  ## otdsUseReleaseName controls whether the release name is used in 
+  ## the names of the objects.
+  ## This value should not be changed as part of an upgrade!
+  otdsUseReleaseName: false
+  ## namespace can be used to deploy to a namespcae other than the
+  ## default namespace.
+  namespace:
+  
+## ingress.* settings allow you to connect to the deployment with HTTPS
+## and a Fully Qualified Domain Name (FQDN) (DNS entry).
+## - enabled defines if a Kubernetes Ingress is used.
+## - secret is the name of the TLS / SSL Kubernetes secret for HTTPS
+##   connections. If no secret is given, SSL is not activated in the
+##   Ingress definition.
+##   Create a secrete in Kubernetes with the following kubectl command:
+##   kubectl create secret tls <secret name> --cert fullchain.pem --key privkey.pem
+## - class is the Ingress class - used for annotations on the different
+##   cloud platforms
+## - annotations are platform specific annotations of the ingress object
+ingress:
+  enabled: &otds_ingress_enabled true
+  secret:
+  class:
+  annotations: {}
+
+########################################################################
+# Directory Services backend subchart:
+# Don't remove the YAML &anchors - only change the parameters behind!
+# (they are used for cross-referencing to avoid repetitive settings)
+########################################################################
+opendj:
+  ## enabled controls if OTDS backend gets deployed as a container in
+  ## Kubernetes. If you have OTDS or OpenDJ deployed somewhere else you
+  ## can set it to false.
+  enabled: &otds_enabled true
+  ## serviceName defines the name of the Kubernetes service for OpenDJ:
+  serviceName: &opendj_service_name opendj
+  ## serviceType defines the type of the Kubernetes service for OpenDJ:
+  serviceType: ClusterIP
+  ## hostname defines the hostname of the Kubernetes container for
+  ## OpenDJ (inside the stateful set definition):
+  hostname: opendj
+  ## replicas for OpenDJ:
+  replicas: 1
+  ## password of the OpenDJ Directory Manager account. Note that if persisting
+  ## data the initial password option will only have an impact on the first run
+  ## that populates the volume.
+  password: &opendj_password otds
+  ## otadminPassword is the password of the otadmin@otds.admin user for OTDS
+  ## Note that if persisting data the initial password option will only have
+  ## an impact on the first run that populates the volume.
+  otadminPassword: otds
+  ## enable if using data originally from a single image OTDS container
+  legacyOtdsData: false
+  ## waitForData should be enabled if data is being migrated from another container
+  waitForData: false
+  ## jvmMemory sets the maximum amount of memory used by the otds-opendj JVM
+  ## If this value is not set, the JVM memory will be set to 50% of
+  ## resources.limits.memory if available otherwise 1.5GiB
+  ## Memory amounts in M, Mi, G or Gi are supported
+  jvmMemory:
+  ## backup.* defines the configuration for scheduled backups of the OpenDJ data
+  backup:
+    ## enable should be set to true enabled if backups are desired 
+    enable: false
+    ## schedule defines a cron schedule which determines how frequently backups
+    ## will be performed.  The value "0 0 * * *" will perform backups daily at
+    ## midnight.  A schedule must be defined for backups to be performed.
+    schedule: "0 0 * * *"
+    ## customDirectory defines a specified for the backup location.  The default
+    ## will be in the bak directory of the opendj data directory.
+    ## /opt/opendj/data/bak if legacyOtdsData is false
+    ## /opt/otds/opendj/bak if legacyOtdsData is true
+    customDirectory:
+    ## sidecarImage defines the additional container image that will be added to the
+    ## opendj pod to allow sending backups to cloud storage.
+    ## A built image is not included, a sample set of files which can be customized
+    ## and used to built an image is included with the opendj chart.
+    ## Note that a full image tage needs to be specified, such as the following
+    ## docker.registry.domain.local/sample-backup:latest
+    sidecarImage: "docker.registry.domain.local/sample-backup:latest"
+    ## sidecarCredSecret defines a secret to be mounted within the backup container.
+    ## For this value to be used, sidecarCredSecretPath must also be defined
+    ## Note that this secret must already exist 
+    sidecarCredSecret:
+    ## sidecarCredSecretPath defines the path within the backup container where
+    ## the secret in sidecarCredSecret will be mounted
+    ## The sample sidecar uses a secret containing a key.json file with the user key
+    sidecarCredSecretPath: 
+    ## sidecarEnv defines the set of environment variables to be used by the backup
+    ## container.  Those needed by the sample container are included as an example
+    ## The sample sidecar mounts the secret at /certs
+    sidecarEnv: |
+      - name: GCLOUD_PROJECT
+        value: gcp_project
+      - name: GCLOUD_BUCKET
+        value: gcp_bucket
+      - name: SLEEPTIME
+        value: "3600"
+      - name: BAK_SRC
+        value: "/opt/opendj/data/bak"
+    ## dailyArchive should be enabled if daily archives of backup data should be 
+    ## created.  The archive will contain the backup data from the day, the
+    ## backup directories will be wiped after the archive is created.
+    dailyArchive: false
+    ## archiveTime should be set to the UTC time that the archive should occur
+    archiveTime: "23:30"
+    ## keepArchives should be set to the number of daily archives to keep
+    keepArchives: 15
+  ## image.* defines Docker image location, tags and pull parameters for
+  ## OpenDJ - you need to adjust this:
+  image:
+    source: registry.opentext.com
+    name: otds-opendj
+    tag: 21.2.0
+    pullPolicy: Always
+    pullSecret:
+  ## resource.* define the resource requirements for OpenDJ:
+  resources:
+    enabled: true
+    requests:
+      cpu: 0.5
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 3Gi
+    ## storage defines the storage size for the OpenDJ volume:
+    storage: 20G
+    ## storageClassName defines the Kubernetes storage class for the
+    ## OpenDJ volume:
+    storageClassName: 
+
+########################################################################
+# Directory Services server subchart:
+# Don't remove the YAML &anchors - only change the parameters behind!
+# (they are used for cross-referencing to avoid repetitive settings)
+########################################################################
+otdsws:
+  ## enabled controls if the OTDS server gets deployed as a container in
+  ## Kubernetes. If you have OTDS deployed somewhere else you can set
+  ## it to false.
+  enabled: *otds_enabled
+  ## ingress.* define Ingress specific settings for OTDS
+  ingress: 
+    enabled: *otds_ingress_enabled
+    secret: 
+  ## serviceName defines the name of the Kubernetes service for OTDS server:
+  serviceName: otdsws
+  ## serviceType can be used to override the spec type for the otdsws
+  ## service.  If not set this value is not set the value is defined
+  ## based on the value of ingress.enabled.  The type is set to Node
+  ## if ingress is enabled and LoadBalancer if it is disabled.
+  serviceType:
+  ## carrierGradeNAT can be set to true to configure Tomcat to treat
+  ## 100.64.0.0/10 addresses as internal for compatibility with environments
+  ## that use Carrier-grade NAT.
+  carrierGradeNAT: false
+  ## replicas for OTDS server:
+  replicas: 1
+  ## port defines the external port for the OTDS Kubernetes service:
+  port: 80
+  ## publicHostname defines the FQDN or IP address of the
+  ## Kubernetes Services of OTDS. If empty ("") the hostname
+  ## will dynamically be determined via the Kubernetes API.
+  publicHostname:
+  ## cryptKey is used for secure synchronized access to OpenDJ from 
+  ## frontend instances
+  ## The value is a 16 character ASCII string that has been base64 encoded
+  cryptKey: Z2hkN2hyNDBkbWNGcVQ0TA==
+  ## additionalJavaOpts defines additional Java parameters for OTDS 
+  additionalJavaOpts:
+  ## enableBootstrapConfig enables the use of the config.yml file in the
+  ## otdsws chart directory to apply a specific set of configuration options
+  ## on startup.
+  ## A sample config.yml file is in the otdsws chart directory
+  enableBootstrapConfig: false
+  ## jvmMemory sets the maximum amount of memory used by the otds-server JVM
+  ## If this value is not set, the JVM memory will be set to 75% of
+  ## resources.limits.memory if available otherwise 512MiB
+  ## Memory amounts in M, Mi, G or Gi are supported
+  jvmMemory:
+  ## opendj.* defines the connection information for the OpenDJ which
+  ## is the backend data storage location for OTDS
+  opendj:
+    ## serviceName defines the name of the Kubernetes service for OpenDJ:
+    serviceName: *opendj_service_name
+    password: *opendj_password
+  ## image.* defines Docker image location, tags and pull parameters for
+  ## OTDS server - you need to adjust this:
+  image:
+    source: registry.opentext.com
+    name: otds-server
+    tag: 21.2.0
+    pullPolicy: Always
+    pullSecret:
+  ## resource.* define the resource requirements for OTDS:
+  resources:
+    enabled: true
+    requests:
+      cpu: 0.5
+      memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 1.5Gi
+    ## storage defines the storage size for the OTDS server volume:
+    storage: 20Mi
+    ## storageClassName defines the Kubernetes storage class for the
+    ## OTDS server volume:
+    storageClassName: 

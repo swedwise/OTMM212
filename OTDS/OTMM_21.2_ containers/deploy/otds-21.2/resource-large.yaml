@@ -1,0 +1,19 @@
+# --LARGE PRODUCTION Standard --
+#
+otdsws:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 1
+      memory: 1Gi
+  jvmMemory: 1Gi
+
+opendj:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 1
+      memory: 3Gi
+    storage: 20Gi
+  jvmMemory: 3Gi
+

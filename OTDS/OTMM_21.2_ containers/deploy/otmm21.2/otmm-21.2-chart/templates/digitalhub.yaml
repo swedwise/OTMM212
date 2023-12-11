@@ -1,0 +1,174 @@
+
+# Optional OTMM components
+{{- if .Values.options.digitalhub }}
+
+##########################################################
+## Digital Hub Storage for OTMM
+###########################################################
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dhub-storage-pvc
+  namespace: {{ .Values.global.namespace }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: {{ .Values.storage.nfsClass }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.digitalhub }}
+
+---
+
+{{- if eq .Values.storage.subPathCompatible false }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dhub-cache-pvc
+  namespace: {{ .Values.global.namespace }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: {{ .Values.storage.nfsClass }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.digitalhub }}
+
+---
+{{- end }}
+
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: digitalhub
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: digitalhub
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount.digitalhub }}
+  selector:
+    matchLabels:
+      app: digitalhub
+  template:
+    metadata:
+      labels:
+        app: digitalhub
+        release: {{ .Release.Name }}
+    spec:
+{{- if eq .Values.nodeSelector.useNodeSelector true }}
+      nodeSelector:
+        {{ .Values.nodeSelector.digitalhub.nodeLabel }}
+{{- end }}
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+      containers:
+      - name: digitalhub
+        image: "{{ .Values.global.repository }}/{{ .Values.digitalhub.container.name }}:{{ .Values.digitalhub.container.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+        resources:
+          requests:
+            memory: {{ .Values.memory.digitalhub }}
+            cpu: {{ .Values.cpu.digitalhub }}
+        envFrom:
+        - configMapRef:
+            name: otmm-configmap
+{{- if eq .Values.global.useNewRelic "true" }}             
+        env:
+        - name: NEW_RELIC_APP_NAME
+          value: "{{ .Values.digitalhub.service.name }}-{{ .Values.global.namespace }}.$(CF_BASE_URL)"
+{{- end }} 
+        ports:
+        - containerPort: {{ .Values.digitalhub.service.port }}
+        readinessProbe:
+          httpGet:
+            path: /media/asl/ping
+            port: {{ .Values.digitalhub.service.port }}
+          initialDelaySeconds: 120
+          failureThreshold: 10
+          periodSeconds: 200
+          timeoutSeconds: 15
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /opt/DigitalHub/tools/liveness_probe.sh dhub_entrypoint.sh
+          initialDelaySeconds: 30
+          failureThreshold: 10
+          periodSeconds: 60
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: dhub-custom-volume
+          mountPath: /opt/DigitalHub/custom
+{{- if eq .Values.storage.subPathCompatible false }}
+        - mountPath: /opt/DigitalHub/data/storage  
+          name: dhub-storage
+        - mountPath: /opt/DigitalHub/var/cache/         
+          name: dhub-cache
+{{- else }}
+        - mountPath: /opt/DigitalHub/data/storage  
+          name: dhub-storage
+          subPath: dhubStorage
+        - mountPath: /opt/DigitalHub/var/cache/         
+          name: dhub-storage
+          subPath: dhubCache
+{{- end }}		  
+		  
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }}
+{{- if $globcustomkey }}
+        - name: custom-encrypt-key-volume
+          mountPath: /opt/etc/key
+{{- end }}
+      volumes:
+      - name: dhub-custom-volume
+        projected:
+          sources:
+          - configMap:
+              name: otmm-secrets-configmap
+          - configMap:
+              name: otmm-responseheader-configmap
+      - name: dhub-storage
+        persistentVolumeClaim:
+          claimName: dhub-storage-pvc
+          readOnly: false
+{{- if eq .Values.storage.subPathCompatible false }}
+      - name: dhub-cache
+        persistentVolumeClaim:
+          claimName: dhub-cache-pvc
+          readOnly: false
+{{- end }}
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }}
+{{- if $globcustomkey }}
+      - name: custom-encrypt-key-volume
+        configMap:
+          name: custom-encrypt-key-configmap
+{{- end }}
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.digitalhub.service.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: digitalhub
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  type: {{ .Values.digitalhub.service.type }}
+  ports:
+    - name: {{ .Values.digitalhub.service.port | quote }}
+      port: {{ .Values.digitalhub.service.port }}
+  selector:
+    app: digitalhub
+    release: {{ .Release.Name }}    
+    
+{{- end }}

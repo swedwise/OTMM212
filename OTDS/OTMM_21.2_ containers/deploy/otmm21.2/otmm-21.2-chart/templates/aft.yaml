@@ -1,0 +1,98 @@
+{{- if .Values.options.filetransfer }}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aft
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: qaftds
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount.filetransfer }}
+  selector:
+    matchLabels:
+      app: aft
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: aft
+        release: {{ .Release.Name }}
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+{{- if eq .Values.nodeSelector.useNodeSelector true }}
+      nodeSelector:
+        {{ .Values.nodeSelector.aft.nodeLabel }}
+{{- end }}
+      containers:
+      - name: aft
+        image: "{{ .Values.global.repository }}/{{ .Values.aft.container.name }}:{{ .Values.aft.container.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+        resources:
+          requests:
+            memory: {{ .Values.memory.filetransfer }}
+            cpu: {{ .Values.cpu.filetransfer }}
+        envFrom:
+        - configMapRef:
+            name: otmm-configmap
+        ports:
+        - containerPort: {{ .Values.aft.service.port }}
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /opt/scripts/aft_readiness_probe.sh
+          initialDelaySeconds: 50
+          failureThreshold: 10
+          periodSeconds: 60
+          timeoutSeconds: 5
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /opt/scripts/liveness_probe.sh qds_entrypoint.sh
+          initialDelaySeconds: 20
+          failureThreshold: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: staging-volume
+          mountPath: "/opt/OTMM/data/cs/working_area"
+        - name: repository-volume
+          mountPath: "/usr/local/share/otmm_repository"
+      volumes:
+      - name: staging-volume
+        persistentVolumeClaim:
+          claimName: video-staging-pvc
+      - name: repository-volume
+        persistentVolumeClaim:
+          claimName: repository-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.aft.service.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: aft
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  type: {{ .Values.aft.service.type }}
+  ports:
+    - name: {{ .Values.aft.service.port | quote }}
+      port: {{ .Values.aft.service.port }}
+  selector:
+    app: aft
+    release: {{ .Release.Name }}
+
+{{- end }}

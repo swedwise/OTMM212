@@ -1,0 +1,6 @@
+rabbitmq:
+  resources:
+    requests:
+      cpu: 300m
+      memory: 1Gi
+    storage: 500Mi

@@ -1,0 +1,528 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dmts-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: dmts-service
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount.dmts.service }}
+  selector:
+    matchLabels:
+      run: dmts-service
+  template:
+    metadata:
+      labels:
+        run: dmts-service
+        release: {{ .Release.Name }}
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+{{- if eq .Values.nodeSelector.useNodeSelector true }}
+      nodeSelector:
+        {{ .Values.nodeSelector.dmts.service.nodeLabel }}
+{{- end }}
+      containers:
+      - name: dmts-service
+        image: "{{ .Values.global.repository }}/{{ .Values.transcode.container.name }}:{{ .Values.transcode.container.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+        resources:
+          requests:
+            memory: {{ .Values.memory.dmts.service }}
+            cpu: {{ .Values.cpu.dmts.service }}
+        envFrom:
+        - configMapRef:
+            name: otmm-configmap
+        env:
+        - name: _JAVA_OPTIONS
+          value: "$(DMTS_SERVICE_JAVA_OPTS)"
+{{- if eq .Values.global.useNewRelic "true" }}             
+        - name: NEW_RELIC_APP_NAME
+          value: "{{ .Values.transcode.service.name }}-{{ .Values.global.namespace }}.$(CF_BASE_URL)"
+{{- end }} 
+        ports:
+        - containerPort: {{ .Values.transcode.service.port }}
+        readinessProbe:
+          httpGet:
+            path: /api/ping
+            port: {{ .Values.transcode.service.port }}
+          initialDelaySeconds: 60
+          failureThreshold: 10
+          periodSeconds: 20
+          timeoutSeconds: 10  
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /opt/DMTS/bin/liveness_probe.sh dmts-service.jar
+          initialDelaySeconds: 60
+          failureThreshold: 100
+          periodSeconds: 20
+          timeoutSeconds: 10  
+        volumeMounts:
+        - name: otmm-secrets-volume
+          mountPath: /opt/DMTS/custom
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }}
+{{- if $globcustomkey }}
+        - name: custom-encrypt-key-volume
+          mountPath: /opt/etc/key
+{{- end }}
+      volumes:
+      - name: otmm-secrets-volume
+        configMap:
+          name: otmm-secrets-configmap
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }}
+{{- if $globcustomkey }}
+      - name: custom-encrypt-key-volume
+        configMap:
+          name: custom-encrypt-key-configmap
+{{- end }}
+
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dmts-video
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: dmts-video
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount.dmts.video }}
+  selector:
+    matchLabels:
+      run: dmts-video
+  template:
+    metadata:
+      labels:
+        run: dmts-video
+        release: {{ .Release.Name }}
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+{{- if eq .Values.nodeSelector.useNodeSelector true }}
+      nodeSelector:
+        {{ .Values.nodeSelector.dmts.video.nodeLabel }}
+{{- end }}
+      containers:
+      - name: dmts-video
+        image: "{{ .Values.global.repository }}/{{ .Values.transcode.video.container.name }}:{{ .Values.transcode.video.container.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+        resources:
+          requests:
+            memory: {{ .Values.memory.dmts.video }}
+            cpu: {{ .Values.cpu.dmts.video }}
+        env:
+        - name: _JAVA_OPTIONS
+          value: "$(DMTS_VIDEO_JAVA_OPTS)"
+{{- if eq .Values.global.useNewRelic "true" }}             
+        - name: NEW_RELIC_APP_NAME
+          value: "{{ .Values.transcode.video.service.name }}-{{ .Values.global.namespace }}.$(CF_BASE_URL)"
+{{- end }}                                                            
+        envFrom:
+        - configMapRef:
+            name: otmm-configmap
+        ports:
+        - containerPort: {{ .Values.transcode.video.service.port }}
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /opt/DMTS/scripts/liveness_probe.sh dmts-video.jar
+          initialDelaySeconds: 20
+          failureThreshold: 10
+          periodSeconds: 20
+          timeoutSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /opt/DMTS/scripts/dmts_video_readiness_probe.sh
+          initialDelaySeconds: 60
+          failureThreshold: 10
+          periodSeconds: 20
+          timeoutSeconds: 10
+        volumeMounts:
+        - name: otmm-staging-volume
+          mountPath: "/var/input_volume"
+        - name: otmm-secrets-volume
+          mountPath: /opt/DMTS/custom
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }}
+{{- if $globcustomkey }}
+        - name: custom-encrypt-key-volume
+          mountPath: /opt/etc/key
+{{- end }}
+      volumes:
+      - name: otmm-staging-volume
+        persistentVolumeClaim:
+          claimName: video-staging-pvc
+          readOnly: false
+      - name: otmm-secrets-volume
+        configMap:
+          name: otmm-secrets-configmap
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }}
+{{- if $globcustomkey }}
+      - name: custom-encrypt-key-volume
+        configMap:
+          name: custom-encrypt-key-configmap
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dmts-image
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: dmts-image
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount.dmts.image }}
+  selector:
+    matchLabels:
+      run: dmts-image
+  template:
+    metadata:
+      labels:
+        run: dmts-image
+        release: {{ .Release.Name }}
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+{{- if eq .Values.nodeSelector.useNodeSelector true }}
+      nodeSelector:
+        {{ .Values.nodeSelector.dmts.image.nodeLabel }}
+{{- end }}
+      containers:
+      - name: dmts-image
+        image: "{{ .Values.global.repository }}/{{ .Values.transcode.image.container.name }}:{{ .Values.transcode.image.container.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+        resources:
+          requests:
+            memory: {{ .Values.memory.dmts.image }}
+            cpu: {{ .Values.cpu.dmts.image }}
+        env:
+        - name: _JAVA_OPTIONS
+          value: "$(DMTS_IMAGE_JAVA_OPTS)"
+{{- if eq .Values.global.useNewRelic "true" }}             
+        - name: NEW_RELIC_APP_NAME
+          value: "{{ .Values.transcode.image.service.name }}-{{ .Values.global.namespace }}.$(CF_BASE_URL)"
+{{- end }} 
+        envFrom:
+        - configMapRef:
+            name: otmm-configmap
+        ports:
+        - containerPort: {{ .Values.transcode.image.service.port }}
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /opt/DMTS/scripts/liveness_probe.sh dmts-image.jar
+          initialDelaySeconds: 60
+          failureThreshold: 10
+          periodSeconds: 20
+          timeoutSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /opt/DMTS/scripts/dmts_image_readiness_probe.sh
+          initialDelaySeconds: 60
+          failureThreshold: 10
+          periodSeconds: 20
+          timeoutSeconds: 10
+        volumeMounts:
+        - name: otmm-staging-volume
+          mountPath: "/var/input_volume"
+        - name: dmts-staging-volume
+          mountPath: "/var/staging"
+        - name: otmm-secrets-volume
+          mountPath: /opt/DMTS/custom
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }}
+{{- if $globcustomkey }}
+        - name: custom-encrypt-key-volume
+          mountPath: /opt/etc/key
+{{- end }}
+      volumes:
+      - name: otmm-staging-volume
+        persistentVolumeClaim:
+          claimName: video-staging-pvc
+          readOnly: false
+      - name: dmts-staging-volume
+        persistentVolumeClaim:
+          claimName: dmts-staging-pvc
+          readOnly: false
+      - name: otmm-secrets-volume
+        configMap:
+          name: otmm-secrets-configmap
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }}
+{{- if $globcustomkey }}
+      - name: custom-encrypt-key-volume
+        configMap:
+          name: custom-encrypt-key-configmap
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: indexer
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: indexer
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount.default }}
+  selector:
+    matchLabels:
+      app: indexer
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: indexer
+        release: {{ .Release.Name }}
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+{{- if eq .Values.nodeSelector.useNodeSelector true }}
+      nodeSelector:
+        {{ .Values.nodeSelector.indexer.nodeLabel }}
+{{- end }}
+      containers:
+      - name: indexer
+        image: "{{ .Values.global.repository }}/{{ .Values.indexer.container.name }}:{{ .Values.indexer.container.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+        resources:
+          requests:
+            memory: {{ .Values.memory.indexer }}
+            cpu: {{ .Values.cpu.indexer }}
+        envFrom:
+        - configMapRef:
+            name: otmm-configmap
+{{- if eq .Values.global.useNewRelic "true" }}             
+        env:
+        - name: NEW_RELIC_APP_NAME
+          value: "{{ .Values.indexer.container.name }}-{{ .Values.global.namespace }}.$(CF_BASE_URL)"
+{{- end }} 
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /opt/OTMM/tools/indexer_readiness_probe.sh true
+          initialDelaySeconds: 150
+          failureThreshold: 10
+          periodSeconds: 60
+          timeoutSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /opt/OTMM/tools/liveness_probe.sh indexer-container-manager.sh
+          initialDelaySeconds: 20
+          failureThreshold: 10
+          periodSeconds: 20
+          timeoutSeconds: 10
+        volumeMounts:
+        - name: otmm-secrets-volume
+          mountPath: /opt/OTMM/custom
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }}
+{{- if $globcustomkey }}
+        - name: custom-encrypt-key-volume
+          mountPath: /opt/etc/key
+{{- end }}
+      volumes:
+      - name: otmm-secrets-volume
+        configMap:
+          name: otmm-secrets-configmap
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }}
+{{- if $globcustomkey }}
+      - name: custom-encrypt-key-volume
+        configMap:
+          name: custom-encrypt-key-configmap
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streaming
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: streaming
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount.default }}
+  selector:
+    matchLabels:
+      app: streaming
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: streaming
+        release: {{ .Release.Name }}
+    spec:
+{{- if eq .Values.nodeSelector.useNodeSelector true }}
+      nodeSelector:
+        {{ .Values.nodeSelector.streaming.nodeLabel }}
+{{- end }}
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+      containers:
+      - name: apache-httpd
+        image: "{{ .Values.global.repository }}/{{ .Values.streaming.container.name }}:{{ .Values.streaming.container.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+        resources:
+          requests:
+            memory: {{ .Values.memory.streaming }}
+            cpu: {{ .Values.cpu.streaming }}
+        envFrom:
+        - configMapRef:
+            name: otmm-configmap
+        ports:
+        - containerPort: {{ .Values.streaming.service.port }}
+        livenessProbe:          
+          httpGet:
+            path: /
+            port: 8080
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 6
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /tmp/streaming_readiness_probe.sh
+          initialDelaySeconds: 1
+          failureThreshold: 1000
+          periodSeconds: 5
+          timeoutSeconds: 10
+        volumeMounts:
+        - name: repository-volume
+          mountPath: "/usr/local/share/otmm_repository"
+      volumes:
+      - name: repository-volume
+        persistentVolumeClaim:
+          claimName: repository-pvc
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search-master
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: search-master
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount.default }}
+  selector:
+    matchLabels:
+      app: search-master
+  template:
+    metadata:
+      labels:
+        app: search-master
+        run: search
+        release: {{ .Release.Name }}
+    spec:
+      securityContext:
+        fsGroup: 8983
+        runAsUser: 8983
+{{- if eq .Values.nodeSelector.useNodeSelector true }}
+      nodeSelector:
+        {{ .Values.nodeSelector.search.master.nodeLabel }}
+{{- end }}
+      containers:
+      - name: solr
+        image: "{{ .Values.global.repository }}/{{ .Values.search.container.name }}:{{ .Values.search.container.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+        resources:
+          requests:
+            memory: {{ .Values.memory.search }}
+            cpu: {{ .Values.cpu.search }}
+        envFrom:
+        - configMapRef:
+            name: otmm-configmap
+{{- if eq .Values.global.useNewRelic "true" }}             
+        env:
+        - name: NEW_RELIC_APP_NAME
+          value: "{{ .Values.search.service.name }}-{{ .Values.global.namespace }}.$(CF_BASE_URL)"
+{{- end }} 
+        ports:
+        - containerPort: 8983
+        readinessProbe:
+          httpGet:
+            path: /solr/otmm/admin/ping
+            port: {{ .Values.search.service.port }}
+          initialDelaySeconds: 60
+          failureThreshold: 10
+          periodSeconds: 20
+          timeoutSeconds: 15
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /opt/solr/tools/liveness_probe.sh solr_entrypoint.sh
+          initialDelaySeconds: 1
+          failureThreshold: 1000
+          periodSeconds: 5
+          timeoutSeconds: 10
+        volumeMounts:
+        - name: solr-master-volume
+          mountPath: "/var/OTMM/solr_otmm"
+        - name: otmm-secrets-volume
+          mountPath: /opt/solr/custom
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }}
+{{- if $globcustomkey }}
+        - name: custom-encrypt-key-volume
+          mountPath: /opt/etc/key
+{{- end }}
+      volumes:
+      - name: solr-master-volume
+        persistentVolumeClaim:
+          claimName: solr-master-pvc
+          readOnly: false
+      - name: otmm-secrets-volume
+        configMap:
+          name: otmm-secrets-configmap
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }}
+{{- if $globcustomkey }}
+      - name: custom-encrypt-key-volume
+        configMap:
+          name: custom-encrypt-key-configmap
+{{- end }}
+
+

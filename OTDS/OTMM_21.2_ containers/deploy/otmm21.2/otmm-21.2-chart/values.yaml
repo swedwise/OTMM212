@@ -1,0 +1,212 @@
+# Default values for otmm-services helm chart.
+# This is a YAML-formatted file.
+# Anchor tags section ----------------------------------
+namespace: &deploy_namespace default
+# ------------------------------------
+# OTMM Product Options
+# ------------------------------------
+enableAMD: &enable_adaptivemedia  false
+enableRMA: &enable_media_analysis false
+enableDH:  &enable_digital_hub    false
+enableQDS: &enable_file_transfer  false
+enableRabbitMQ: &enable_rabbitmq  true
+# ------------------------------------
+# Public Hostname configuration
+# ------------------------------------
+ingressClass: &ingress_class nginx
+secureEndpoints: &secure_endpoints false
+#-------------------------------------
+# - Option to use default ingress host(GKE, minikube)
+# -- if it is set to true, the service ingress hosts will be using default value of the kubernetes ingress controller
+#    the ingress controller will fulfill all service requests with a load balancer to the ingress
+#    specify publicHostName with the external load balancer FQDN_OR_IP
+# ------------------------------------
+useDefaultIngressHost: &use_default_ingress_host false
+#-------------------------------------
+# - Specifying a specific public hostname for each service
+# --  specify an FQDN domain name
+# --  specify an optional hostname suffix (e.g. otmm-dev  - suffix="dev")
+#     default is the namespace
+#   publicHostName - if specified, all services will use it as a single hostname
+# ------------------------------------
+publicHostDomain: &public_host_domain "35.239.144.7.nip.io"
+publicHostSuffix: &public_host_suffix
+publicHostName: &public_host_name
+#-------------------------------------
+# - Independent public hostname
+# ------------------------------------
+otdsPublicHostname: &otds_host "104.198.197.211"
+mbirPublicHostname: &mbir_host 
+# ------------------------------------
+# Docker Registry configuration
+# ------------------------------------
+dockerRegistry: &docker_registry "europe-north1-docker.pkg.dev/prime-cosmos-405311/otmm212"
+# ------------------------------------
+# Storage Configuration
+# Volume storage classes;  RWX, RWO, SSD (fast)
+# If no "fast" storage class is available, use '*rwo_storage_class'
+# ------------------------------------
+rwoStorageClass: &rwo_storage_class nfs-client
+rwxStorageClass: &rwx_storage_class nfs-client
+ssdStorageClass: &ssd_storage_class nfs-client
+searchMasterAccessMode: &solr_master_pvc ReadWriteOnce
+# ------------------------------------
+# ------------------------------------
+
+# ------------------------------------
+#  PROXY settings
+# ------------------------------------
+javaOptions:
+  proxy: false
+  proxyhost: "<proxy hostname>"
+  proxyport: "<proxy port number>"
+  noproxy: "<no proxy hosts>"
+
+# ------------------------------------
+#  Database settings
+# ------------------------------------
+database:
+  # specify DB_TYPE: POSTGRESQL, SQLSERVER, ORACLE
+  type: SQLSERVER
+  # specify the DATABASE_HOST: "<FQDN_OR_IP>"
+  host: 10.128.0.47
+  # specify the DATABASE_PORT: 5432
+  port: 1433
+
+# ------- END CONFIGURATION ----------------------------
+global:
+  namespace: *deploy_namespace
+  repository: *docker_registry
+  imagePullPolicy: Always
+  serviceType: ClusterIP
+  secureEndpoints: *secure_endpoints
+  useDefaultExternalHost: *use_default_ingress_host
+  publicHostName: *public_host_name
+  suffix: *public_host_suffix
+  domain: *public_host_domain
+  encryptionKey: false
+
+storage:
+  defaultClass: *rwo_storage_class
+  nfsClass: *rwx_storage_class
+  ssdClass: *ssd_storage_class
+  
+  subPathCompatible: true
+  searchMasterAccess: *solr_master_pvc
+
+httpData:
+  maxBodySize: "0"
+
+options:
+  adaptivemedia: *enable_adaptivemedia
+  filetransfer: *enable_file_transfer
+  digitalhub: *enable_digital_hub
+  mediaanalysis: *enable_media_analysis
+  supportmgr: true
+
+
+ingress:
+  class: *ingress_class
+# Public Hostnames 
+#  Use empty public hostnames when 'useDefaultExternalHost' is true
+  otds:
+    host: *otds_host
+  mbir:
+    host: *mbir_host
+
+nodeSelector:
+  useNodeSelector: false
+
+rabbitmq:
+  enabled: *enable_rabbitmq
+  storage:
+    class: *rwo_storage_class
+  replicaCount:
+    default: 1
+  ingress:
+    class: *ingress_class    
+  nodeSelector:
+    useNodeSelector: false      
+
+  
+configmaps:
+  EXTERNAL_DEFAULT_PORT: "80"
+  ADMIN_EMAIL_ADDRESS: "mediamanagement@domain.com"
+  EMAIL_SERVER: "webmail.domain.com"
+  # External services (deployed as containers == false)
+  RMA_EXTERNAL_SERVICE: "false"
+  OTDS_EXTERNAL_SERVICE: "false"
+  # Specify OTDS tenant name if use tenant config, if not specified, use default OTDS
+  # OTDS_TENANT_NAME: tenant1
+
+  # - DB_TABLESPACE_PREFIX can be any string. 9 chars or less.  No spaces.
+  # --  The Tablespace prefix creates customer-specific tablespaces 
+  # --  if prefix="PROD" tablespace becomes PROD_TEAMS_CATALOG_IDX
+  # --  The POSTGRESQL_OTMMDB_DIR folder is used to persist the OTMM tablespaces
+  # ------------------------------------------------------------
+
+  DB_USE_DEFAULT_TABLESPACE: "false"
+  DB_TABLESPACE_PREFIX: ""
+  # POSTGRESQL_OTMMDB_DIR: "/opt/OTMM/db"
+  
+  # ORACLE Database configs
+  # ------------------------------------------------------------
+  # ORACLE_SERVICE_NAME: "<ORACLE_SERVICE_NAME>"
+    
+  # external port numbers
+  # Set the following if they differ from EXTERNAL_DEFAULT_PORT
+  # ------------------------------------------------------------
+  # OTDS_EXTERNAL_ACCESS_PORT: "80"
+  # OTMM_EXTERNAL_ACCESS_PORT: "80"
+  # AFT_EXTERNAL_ACCESS_PORT: "80"
+  # DHUB_EXTERNAL_ACCESS_PORT: "80"
+  # STREAM_EXTERNAL_ACCESS_PORT: "80"
+  #
+  
+  # Media Management Properties
+  # -------------------------------------------------
+  #OTMM_RESOURCE_NAME: "OTMM_Resource"
+  # OTMM_USER_PARTITION: "MediaMgmt"
+  #OTMM_DATABASE_NAME: "otmm_db"
+  #SESSION_TIMEOUT_TIME: "3"
+  
+  # DMTS properties
+  # -------------------------------------------------
+  JOBS_TRANSFORMATIONS_PROCESSED_CONCURRENTCOUNT: "30"
+  JOBS_TRANSFORMATIONS_IMAGECONCURRENTCOUNT: "30"
+  JOBS_TRANSFORMATIONS_VIDEOCONCURRENTCOUNT: "30"
+ 
+  #
+  # Media Analysis properties
+  # -------------------------------------------------
+  # MEDIAANALYSIS_AZURE_CVROOTURL: "https://westcentralus.api.cognitive.microsoft.com/vision/v2.0"
+  # MEDIAANALYSIS_AZURE_SUBSCRIPTIONKEY: "<azure_image_subscr_key>"
+  # MEDIAANALYSIS_AZURE_VIDEOINDEXER_URL: "https://api.videoindexer.ai/westus2/Accounts/<VIDEO_INDEX_ACCOUNT>/Videos"
+  # MEDIAANALYSIS_AZURE_VIDEOINDEXER_SUBSCRIPTIONKEY: "<video_index_sub_key>"
+  # MEDIAANALYSIS_AZURE_VIDEOINDEXER_AUTH_URL: "https://api.videoindexer.ai/auth/westus2/Accounts/<VIDEO_INDEX_ACCOUNT>/"
+  # -------------------------------------------------
+  # OPTIONAL configuration options
+  # Provide a list of comma-separated IP addresses
+  # -------------------------------------------------
+  # MEDIAANALYSIS_CLIENTIPLIST: 
+  # -------------------------------------------------
+  # Job concurrency
+  # -------------------------------------------------
+  # MEDIAANALYSIS_JOBS_ANALYTICS_CONCURRENTCOUNT: "1"
+  # MEDIAANALYSIS_JOBS_PROCESSED_CONCURRENTCOUNT: "1"
+
+  # Database properties 
+  # Adaptive Media Delivery 
+  # -------------------------------------------------
+  # AMD_DATABASE: "amd_db"
+  #
+  # Digital Hub 
+  # ------------------------------------------------------
+  # DHUB_DATABASE: "dhub_db"
+  #
+  # Hotfix Manager 
+  # -------------------------------------------------
+  # HFMGR_DB: "otmm_db"
+
+  # -------------------------------------------------
+  # ------------------------------------------------------

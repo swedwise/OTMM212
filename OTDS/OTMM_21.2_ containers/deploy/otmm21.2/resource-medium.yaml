@@ -1,0 +1,80 @@
+# Define the replicas and resources for a OTMM container deployment
+# --  MEDIUM PRODUCTION Standard --
+# 
+#
+
+storage:
+  adaptivemedia: 65Gi
+  database: 50Gi
+  digitalhub: 10Gi
+  otmmRepository: 2000Gi
+  search: 52Gi
+  staging: 625Gi
+  dmts: 125Gi
+  kahadb: 10Gi
+  rabbitmq: &rabbitmq_storage 500Mi
+  
+memory:
+  otmm: 16Gi
+  indexer: 4Gi
+  search: 9Gi
+  dmts:
+    service: 2Gi
+    image: 6Gi
+    video: 6Gi
+  adaptivemedia: 4Gi
+  digitalhub: 8Gi
+  filetransfer: 2Gi
+  mediaanalysis: 4Gi
+  supportmgr: 500Mi
+  streaming: 2Gi
+  rabbitmq: &rabbitmq_memory 2Gi
+  
+cpu:
+  otmm: 3.5
+  indexer: 500m
+  search: 2
+  dmts:
+    service: 500m
+    image: 1.5
+    video: 1.5
+  adaptivemedia: 1
+  digitalhub: 2.5
+  filetransfer: 1
+  mediaanalysis: 500m
+  supportmgr: 100m
+  streaming: 500m
+  rabbitmq: &rabbitmq_cpu 500m
+
+replicaCount:
+  default: 1
+  adaptivemedia: 1
+  otmm: 2
+  dmts:
+    service: 1
+    image: 2
+    video: 2
+  searchSecondary: 1
+  digitalhub: 1
+  mediaanalysis: 1
+  filetransfer: 1
+
+javaOptions:
+  otmmjvmopts: -Xms4g -Xmx16g -Dcom.amazonaws.sdk.disableCertChecking=true
+  indexjvmopts: -Xms1024m -Xmx4g
+  searchjvmopts: -Xms2048m -Xmx9g
+  dmts:
+    imagejvmopts: -Xms2048m -Xmx6g
+    videojvmopts: -Xms2048m -Xmx6g
+    servicejvmopts: -Xms1024m -Xmx2048g
+  amdjvmopts: -Xms1024m -Xmx4g
+  dhubjvmopts: -Xms1024m -Xmx6g
+  rmajvmopts: -Xms2048m -Xmx4g
+  supportjvmopts: -Xms512m -Xmx512m
+
+rabbitmq:
+  resources:
+    requests:
+      cpu: *rabbitmq_cpu
+      memory: *rabbitmq_memory
+    storage: *rabbitmq_storage

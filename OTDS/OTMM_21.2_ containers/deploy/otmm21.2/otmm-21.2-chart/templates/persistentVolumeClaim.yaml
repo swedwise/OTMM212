@@ -1,0 +1,93 @@
+##########################################################
+# Persistent Volume Claims for OpenText MediaManagement
+##########################################################
+
+
+##########################################################
+# Postgres DB for OTMM
+##########################################################
+{{- if .Values.options.postgres }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: database-pvc
+  namespace: {{ .Values.global.namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.storage.defaultClass }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.database }}
+---
+
+{{- end }}
+
+##########################################################
+# Repository for OTMM
+##########################################################
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: repository-pvc
+  namespace: {{ .Values.global.namespace }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: {{ .Values.storage.nfsClass }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.otmmRepository }}
+---
+
+##########################################################
+# Video Staging for OTMM + DMTS
+##########################################################
+
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: video-staging-pvc
+  namespace: {{ .Values.global.namespace }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: {{ .Values.storage.nfsClass }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.staging }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dmts-staging-pvc
+  namespace: {{ .Values.global.namespace }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: {{ .Values.storage.nfsClass }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.dmts }}
+
+---
+
+##########################################################
+## Solr Search for OTMM
+###########################################################
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: solr-master-pvc
+  namespace: {{ .Values.global.namespace }}
+spec:
+  accessModes:
+    - {{ .Values.storage.searchMasterAccess }}
+  storageClassName: {{ .Values.storage.ssdClass }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.search }}
+

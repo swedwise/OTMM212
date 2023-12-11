@@ -1,0 +1,4 @@
+# response-headers.
+X-XSS-Protection=1; mode=block
+Cache-control=private
+X-Content-Security-Policy=script-src 'self'

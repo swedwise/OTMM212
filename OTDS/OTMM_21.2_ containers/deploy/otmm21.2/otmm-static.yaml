@@ -1,0 +1,156 @@
+# ---- OpenText Internal configuration values ----
+global:
+# Used with New Relic APM agent
+  useNewRelic: "false"
+  kubeGitVersion: ">=1.19-0"
+
+# ---- Static values ----
+database:
+  container:
+    name: otmm_postgres
+    tag: 21.2
+  service:
+    name: postgres
+    type: ClusterIP
+    port: 5432
+
+otmm:
+  container:
+    name: otmm
+    tag: &otmm_version_tag 21.2
+  service:
+    name: media-management
+    type: ClusterIP
+    port: 11090
+    ejbdPort: 11099
+  publicHost:
+    baseName: otmm
+ 
+transcode:
+  container:
+    name: dmts_service
+    tag: *otmm_version_tag
+  service:
+    name: dmts-service
+    type: ClusterIP
+    port: 8080
+  video:
+    container:
+      name: dmts_video
+      tag: *otmm_version_tag
+    service:
+      name: dmts-video
+      type: ClusterIP
+      port: 8080
+
+  image:
+    container:
+      name: dmts_image
+      tag: *otmm_version_tag
+    service:
+      name: dmts-image
+      type: ClusterIP
+      port: 8080
+  
+adaptivemedia:
+  container:
+    name: otmm_amd
+    tag: *otmm_version_tag
+  
+  service:
+    name: adaptivemedia
+    type: ClusterIP
+    port: 8080
+  publicHost:
+    baseName: amd
+  
+search:
+  container:
+    name: otmm_solr
+    tag: *otmm_version_tag
+  
+  service:
+    name: search
+    type: ClusterIP
+    port: 8983
+
+    secondary:
+      name: search-replica
+  publicHost:
+    baseName: search
+
+indexer:
+  container:
+    name: otmm_index
+    tag: *otmm_version_tag
+  
+streaming:
+  container:
+    name: otmm_apache
+    tag: *otmm_version_tag
+  
+  service:
+    name: streaming
+    type: ClusterIP
+    port: 8080
+  
+  publicHost:
+    baseName: streaming
+
+  
+rabbitmq:
+  container:
+    name: otmm_rabbitmq
+    tag: 3.8.14-management-alpine
+  service:
+    name: message-queue
+    type: ClusterIP
+    port: 5672
+    adminPort: 15672
+  publicHost:
+    baseName: rabbitmq
+
+mediaanalysis:
+  service:
+    name: rma
+    type: ClusterIP
+    port: 8093
+  
+  container:
+    name: otmm_rma
+    tag: *otmm_version_tag
+
+digitalhub:
+  container:
+    name: dhub_server
+    tag: *otmm_version_tag
+  
+  service:
+    name: digitalhub
+    type: ClusterIP
+    port: 8080
+  publicHost:
+    baseName: dhub
+
+aft:
+  container:
+    name: qds_otmm
+    tag: 21.1.1
+
+  service:
+    name: qds
+    type: ClusterIP
+    port: 8080
+  publicHost:
+    baseName: aft
+
+supportmgr:
+  container:
+    name: otmm_support
+    tag: *otmm_version_tag
+
+  service:
+    name: supportmgr
+    type: ClusterIP
+    port: 8080
+

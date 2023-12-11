@@ -1,0 +1,263 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: otmm
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: otmm
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount.otmm }}
+  selector:
+    matchLabels:
+      run: otmm
+  serviceName: {{ .Values.otmm.service.name }}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: otmm
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000    
+{{- if eq .Values.nodeSelector.useNodeSelector true }}
+      nodeSelector:
+        {{ .Values.nodeSelector.otmm.nodeLabel }}
+{{- end }}
+      containers:
+      - name: otmm
+        image: "{{ .Values.global.repository }}/{{ .Values.otmm.container.name }}:{{ .Values.otmm.container.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+        resources:
+          requests:
+            memory: {{ .Values.memory.otmm }}
+            cpu: {{ .Values.cpu.otmm }}
+        envFrom:
+        - configMapRef:
+            name: otmm-configmap
+{{- if eq .Values.global.useNewRelic "true" }}             
+        env:
+        - name: NEW_RELIC_APP_NAME
+          value: "{{ .Values.otmm.service.name }}-{{ .Values.global.namespace }}.$(CF_BASE_URL)"
+{{- end }}                                                           
+        ports:
+        - containerPort: {{ .Values.otmm.service.port }}
+        - containerPort: {{ .Values.otmm.service.ejbdPort }}
+        readinessProbe:
+          httpGet:
+            path: /teams/ping
+            port: {{ .Values.otmm.service.port }}
+          initialDelaySeconds: 140
+          periodSeconds: 60
+          timeoutSeconds: 15
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /opt/OTMM/tools/liveness_probe.sh otmm_entrypoint.sh
+          initialDelaySeconds: 30
+          failureThreshold: 10
+          periodSeconds: 30
+          timeoutSeconds: 10
+        volumeMounts:
+        - name: otmm-custom-volume
+          mountPath: /opt/OTMM/custom
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }}
+{{- if $globcustomkey }}
+        - name: custom-encrypt-key-volume
+          mountPath: /opt/etc/key
+{{- end }}
+        - name: repository-volume
+          mountPath: "/usr/local/share/otmm_repository"
+        - name: staging-volume
+          mountPath: "/opt/OTMM/data/cs/working_area"
+        - name: kahadb-volume
+          mountPath: "/opt/OTMM/kaha"
+{{- $globinternalusertype := .Files.Glob "conf/internal/user_types.sql" }}
+{{- if $globinternalusertype }}
+        - name: internal-user-types-volume
+          mountPath: /opt/internal
+{{- end }}
+{{- $globlicense := .Files.Glob "conf/licenses/*" }}
+{{- if $globlicense }}
+        - name: license-volume
+          mountPath: "/opt/OTMM/license"
+{{- end }}
+
+{{- $globscripts := .Files.Glob "conf/scripts/*" }}
+{{- if $globscripts }}
+        - mountPath: "/opt/OTMM/tools/post-deploy"
+          name: otmm-scripts-volume
+
+# -- BEGIN initContainer --
+      initContainers:
+      - name: custom-scripts
+        image: {{ .Values.global.busybox }}
+        command: [ "sh", "-c", "cp /var/scripts/*.sh /opt/OTMM/tools/post-deploy; chmod 770 /opt/OTMM/tools/post-deploy/*.sh" ]
+        volumeMounts:
+        - mountPath: "/var/scripts"
+          name: scripts-configmap-volume
+        - mountPath: "/opt/OTMM/tools/post-deploy"
+          name: otmm-scripts-volume
+# -- END initContainer --
+{{- end }}
+
+      volumes:
+      - name: otmm-custom-volume
+        projected:
+          sources:
+          - configMap:
+              name: otmm-secrets-configmap
+          - configMap:
+              name: otmm-responseheader-configmap
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }}
+{{- if $globcustomkey }}
+      - name: custom-encrypt-key-volume
+        configMap:
+          name: custom-encrypt-key-configmap
+{{- end }}
+{{- $globinternalusertype := .Files.Glob "conf/internal/user_types.sql" }}
+{{- if $globinternalusertype }}
+      - name: internal-user-types-volume
+        configMap:
+          name: internal-user-types-configmap
+{{- end }}
+      - name: repository-volume
+        persistentVolumeClaim:
+          claimName: repository-pvc
+          readOnly: false
+      - name: staging-volume
+        persistentVolumeClaim:
+          claimName: video-staging-pvc
+          readOnly: false
+{{- $globlicense := .Files.Glob "conf/licenses/*" }}
+{{- if $globlicense }}
+      - name: license-volume
+        configMap:
+          name: otmm-license-configmap
+{{- end }}
+{{- $globscripts := .Files.Glob "conf/scripts/*" }}
+{{- if $globscripts }}
+      - name: scripts-configmap-volume
+        configMap:
+          name: otmm-scripts-configmap
+      - name: otmm-scripts-volume
+        emptyDir: {}
+{{- end }}
+  volumeClaimTemplates:
+  - metadata:
+      name: kahadb-volume
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      storageClassName: {{ .Values.storage.ssdClass }}
+      resources:
+        requests:
+          storage: {{ .Values.storage.kahadb }}
+
+---
+
+{{- if gt (.Values.replicaCount.searchSecondary | int64) 0 }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: search-secondary
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: search-secondary
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount.searchSecondary }}
+  selector:
+    matchLabels:
+      app: search-secondary
+      release: {{ .Release.Name }}
+  serviceName: {{ .Values.search.service.secondary.name }}
+  template:
+    metadata:
+      labels:
+        app: search-secondary
+        run: search
+        release: {{ .Release.Name }}
+    spec:
+      securityContext:
+        fsGroup: 8983
+        runAsUser: 8983
+{{- if eq .Values.nodeSelector.useNodeSelector true }}
+      nodeSelector:
+        {{ .Values.nodeSelector.search.secondary.nodeLabel }}
+{{- end }}
+      containers:
+      - name: solr
+        image: "{{ .Values.global.repository }}/{{ .Values.search.container.name }}:{{ .Values.search.container.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+        resources:
+          requests:
+            memory: {{ .Values.memory.search }}
+            cpu: {{ .Values.cpu.search }}
+        env:
+        - name: SOLR_SECONDARY
+          value: "Y"
+        envFrom:
+        - configMapRef:
+            name: otmm-configmap
+        ports:
+        - containerPort: 8983
+        readinessProbe:
+          httpGet:
+            path: /solr/otmm/admin/ping
+            port: {{ .Values.search.service.port }}
+          initialDelaySeconds: 60
+          periodSeconds: 200
+          timeoutSeconds: 15
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /opt/solr/tools/liveness_probe.sh solr_entrypoint.sh
+          initialDelaySeconds: 30
+          failureThreshold: 10
+          periodSeconds: 20
+          timeoutSeconds: 10
+        volumeMounts:
+        - mountPath: "/var/OTMM/solr_otmm"
+          name: solr-index
+        - mountPath: /opt/solr/custom
+          name: otmm-secrets-volume
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }}
+{{- if $globcustomkey }}
+        - name: custom-encrypt-key-volume
+          mountPath: /opt/etc/key
+{{- end }}
+      volumes:
+      - name: otmm-secrets-volume
+        configMap:
+          name: otmm-secrets-configmap
+{{- $globcustomkey := .Files.Glob "conf/vault/key.txt" }}
+{{- if $globcustomkey }}
+      - name: custom-encrypt-key-volume
+        configMap:
+          name: custom-encrypt-key-configmap
+{{- end }}
+  volumeClaimTemplates:
+  - metadata:
+      name: solr-index
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      storageClassName: {{ .Values.storage.ssdClass }}
+      resources:
+        requests:
+          storage: {{ .Values.storage.search }}
+
+{{- end }}
+

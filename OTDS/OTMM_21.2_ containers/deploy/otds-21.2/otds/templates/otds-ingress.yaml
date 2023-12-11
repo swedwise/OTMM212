@@ -1,0 +1,85 @@
+{{- if eq .Values.ingress.enabled true }}
+
+########################################################################
+# Kubernetes Ingress for OTDS
+# External Interface to provide a Fully Qualified Domain Name (FQDN)
+# and enable secure HTTPS communication (if ingress.secret is provided)
+########################################################################
+{{- if .Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress" }}
+apiVersion: networking.k8s.io/v1
+{{ else }}
+apiVersion: extensions/v1beta1
+{{ end }}
+kind: Ingress
+metadata:
+{{- if eq .Values.global.otdsUseReleaseName true }}
+  name: {{ printf "%s-%s" .Release.Name .Chart.Name }}-ingress
+{{- else }}
+  name: {{ .Chart.Name }}-ingress
+{{- end }}
+{{- if .Values.global.namespace }}
+  namespace: {{ .Values.global.namespace }}
+{{- end }}
+  annotations:
+{{- if not (.Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress") }}
+{{- if .Values.ingress.class }}
+    kubernetes.io/ingress.class: {{ .Values.ingress.class }}
+{{- end }}
+{{- end }}
+{{- range $key, $value := .Values.ingress.annotations }}
+    {{ $key }}: {{ $value | squote }}
+{{- end }}
+spec:
+{{- if .Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress" }}
+{{- if .Values.ingress.class }}
+  ingressClassName: {{ .Values.ingress.class }}
+{{- end }}
+{{- end }}
+{{- if .Values.ingress.secret }}
+  tls:
+    - secretName: {{ .Values.ingress.secret }}
+      hosts:
+        - {{ .Values.otdsws.publicHostname }}
+{{- end }}
+  rules:
+    - host: {{ .Values.otdsws.publicHostname }}
+      http:
+        paths:
+{{- if .Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress" }}
+          - pathType: Prefix
+{{- if .Values.otdsws.ingress.prependPath }}
+            path: {{ printf "/%s/" .Values.otdsws.ingress.prependPath }}
+{{- else }}
+            path: "/"
+{{- end }}
+            backend:
+              service:
+{{- if eq .Values.global.otdsUseReleaseName true }}
+                name: {{ printf "%s-%s" .Release.Name .Values.otdsws.serviceName }}
+{{- else }}
+                name: {{ .Values.otdsws.serviceName }}
+{{- end }}
+                port:
+                  number: {{ .Values.otdsws.port }}
+{{ else }}
+          - backend:
+{{- if .Values.otdsws.ingress.prependPath }}
+{{- if eq .Values.global.otdsUseReleaseName true }}
+              serviceName: {{ printf "%s-%s" .Release.Name .Values.otdsws.serviceName }}
+{{- else }}
+              serviceName: {{ .Values.otdsws.serviceName }}
+{{- end }}
+              servicePort: {{ .Values.otdsws.port }}
+            path: {{ printf "/%s/" .Values.otdsws.ingress.prependPath }}
+{{- else }}
+{{- if eq .Values.global.otdsUseReleaseName true }}
+              serviceName: {{ printf "%s-%s" .Release.Name .Values.otdsws.serviceName }}
+{{- else }}
+              serviceName: {{ .Values.otdsws.serviceName }}
+{{- end }}
+              servicePort: {{ .Values.otdsws.port }}
+{{- end }}
+{{- end }}
+---
+
+{{- end }}
